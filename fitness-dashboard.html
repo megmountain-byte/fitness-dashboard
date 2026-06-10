@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --accent: #6366f1;
+    --accent-light: #eef2ff;
+    --accent2: #10b981;
+    --accent2-light: #ecfdf5;
+    --accent3: #f59e0b;
+    --accent3-light: #fffbeb;
+    --text: #111827;
+    --text-muted: #6b7280;
+    --red: #ef4444;
+    --red-light: #fef2f2;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* NAV */
+  .nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; align-items: center; gap: 4px; position: sticky; top: 0; z-index: 100; }
+  .nav-brand { font-weight: 700; font-size: 16px; color: var(--accent); margin-right: 16px; padding: 14px 0; }
+  .nav-tab { padding: 14px 14px; font-size: 14px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* LAYOUT */
+  .page { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
+  .page.active { display: block; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* CARDS */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .stat-value { font-size: 32px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #4f46e5; }
+  .btn-success { background: var(--accent2); color: #fff; }
+  .btn-success:hover { background: #059669; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { background: var(--bg); }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid #fecaca; font-size: 13px; padding: 6px 10px; }
+  .btn-danger:hover { background: var(--red-light); }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+  /* FORMS */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 13px; font-weight: 500; color: var(--text-muted); display: block; margin-bottom: 5px; }
+  .form-input { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--text); background: var(--card); transition: border-color 0.15s; }
+  .form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  .form-row { display: flex; gap: 10px; }
+  .form-row .form-group { flex: 1; margin-bottom: 0; }
+
+  /* ATTENDANCE CALENDAR */
+  .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 8px; }
+  .cal-day-label { font-size: 11px; color: var(--text-muted); text-align: center; font-weight: 600; padding-bottom: 4px; }
+  .cal-day { aspect-ratio: 1; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-muted); transition: all 0.15s; position: relative; }
+  .cal-day:hover { border-color: var(--accent); }
+  .cal-day.attended { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .cal-day.today { border-color: var(--accent3); border-width: 2px; }
+  .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+  .cal-month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-month-title { font-size: 15px; font-weight: 600; }
+
+  /* STREAK BADGE */
+  .streak-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--accent3-light); color: var(--accent3); font-weight: 600; font-size: 14px; padding: 8px 14px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* WORKOUT LOG */
+  .exercise-row { display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg); border-radius: 8px; margin-bottom: 6px; }
+  .exercise-name { font-weight: 500; font-size: 14px; flex: 1; }
+  .exercise-badge { font-size: 12px; color: var(--text-muted); background: var(--card); border: 1px solid var(--border); padding: 3px 8px; border-radius: 12px; }
+  .session-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+  .session-date { font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+  .session-notes { font-size: 13px; color: var(--text-muted); margin-top: 8px; font-style: italic; }
+
+  /* METRICS */
+  .metric-entry { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .metric-entry:last-child { border-bottom: none; }
+  .metric-date { font-size: 13px; color: var(--text-muted); }
+  .metric-val { font-size: 15px; font-weight: 600; }
+  .metric-delta { font-size: 12px; font-weight: 500; padding: 2px 7px; border-radius: 10px; }
+  .delta-down { background: #dcfce7; color: #166534; }
+  .delta-up { background: #fee2e2; color: #991b1b; }
+  .delta-neutral { background: var(--bg); color: var(--text-muted); }
+
+  /* TABS WITHIN PAGE */
+  .inner-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--bg); padding: 4px; border-radius: 10px; border: 1px solid var(--border); width: fit-content; }
+  .inner-tab { padding: 7px 14px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 7px; color: var(--text-muted); transition: all 0.15s; }
+  .inner-tab.active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+
+  /* MISC */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-size: 18px; font-weight: 700; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
+  .empty-icon { font-size: 32px; margin-bottom: 8px; }
+  .tag { display: inline-block; background: var(--accent-light); color: var(--accent); font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .goal-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+  .goal-label { font-size: 14px; font-weight: 500; }
+  .progress-bar-wrap { flex: 1; margin: 0 14px; background: var(--bg); border-radius: 99px; height: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .progress-bar-fill { height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.4s; }
+  .progress-bar-fill.green { background: var(--accent2); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border-radius: 16px; padding: 24px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .chart-wrap { position: relative; height: 200px; margin-top: 8px; }
+  .week-goal-display { font-size: 28px; font-weight: 700; }
+
+  /* PROGRAM PAGE */
+  .prog-exercise { display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px; }
+  .prog-exercise.warmup { border-color:var(--accent2); background:var(--accent2-light); }
+  .prog-img-wrap { width:70px;height:70px;flex-shrink:0;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--border); }
+  .prog-img-wrap img { width:100%;height:100%;object-fit:contain;padding:4px; }
+  .prog-img-wrap .prog-no-img { font-size:10px;color:var(--text-muted);text-align:center;line-height:1.4;padding:4px; }
+  .prog-exercise-name { font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px; }
+  .prog-exercise-muscle { font-size:12px;color:var(--text-muted);margin-bottom:7px; }
+  .prog-badges { display:flex;flex-wrap:wrap;gap:4px; }
+  .prog-badge { font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg);color:var(--text-muted);border:1px solid var(--border); }
+  .prog-badge-weight { background:var(--accent-light);color:var(--accent);border-color:var(--accent-light); }
+  .prog-badge-warmup { background:var(--accent2-light);color:var(--accent2);border-color:var(--accent2-light); }
+  .prog-badge-light { background:var(--accent3-light);color:var(--accent3);border-color:var(--accent3-light); }
+  .prog-day-label { font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin:0 0 12px; }
+  .prog-sched { display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center; }
+  .prog-sched-label { font-size:10px;color:var(--text-muted);margin-bottom:4px; }
+  .prog-sched-pill { font-size:11px;font-weight:600;padding:5px 3px;border-radius:6px; }
+
+  /* NEXT WORKOUT BANNER */
+  .next-workout-card { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+
+  /* QUICK-LOG OVERLAY */
+  .ql-overlay { position:fixed; inset:0; background:var(--bg); z-index:300; overflow-y:auto; }
+  .ql-header { background:var(--card); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10; }
+  .ql-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:10px; overflow:hidden; transition:border-color 0.15s; }
+  .ql-card.expanded { border-color:var(--accent); box-shadow:0 0 0 2px rgba(99,102,241,0.1); }
+  .ql-card.done { border-color:var(--accent2); }
+  .ql-card-header { display:flex; align-items:center; gap:11px; padding:12px; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
+  .ql-card-img { width:52px; height:52px; border-radius:8px; object-fit:contain; background:var(--bg); border:1px solid var(--border); flex-shrink:0; padding:3px; }
+  .ql-card-name { font-size:15px; font-weight:600; line-height:1.2; }
+  .ql-card-sub { font-size:12px; color:var(--text-muted); margin-top:3px; }
+  .ql-card-body { padding:10px 12px 14px; border-top:1px solid var(--border); }
+  .ql-set-row { display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--border); }
+  .ql-set-row:last-of-type { border-bottom:none; }
+  .ql-set-label { font-size:13px; font-weight:600; color:var(--text-muted); min-width:42px; flex-shrink:0; }
+  .ql-num-input { width:62px; padding:8px 4px; border:1px solid var(--border); border-radius:8px; font-size:17px; font-weight:700; text-align:center; background:var(--card); color:var(--text); }
+  .ql-num-input:focus { outline:none; border-color:var(--accent); }
+  .ql-set-unit { font-size:13px; color:var(--text-muted); flex-shrink:0; }
+  .ql-log-btn { margin-left:auto; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer; flex-shrink:0; }
+  .ql-log-btn.warmup-done { background:var(--accent2); width:100%; padding:12px; font-size:15px; border-radius:10px; }
+  .ql-status-dot { width:26px; height:26px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; color:var(--text-muted); font-weight:700; }
+  .ql-status-dot.in-progress { border-color:var(--accent); color:var(--accent); }
+  .ql-status-dot.complete { background:var(--accent2); border-color:var(--accent2); color:#fff; font-size:14px; }
+  .ql-progression-badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:10px; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; white-space:nowrap; flex-shrink:0; }
+  .ql-rest-banner { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:rgba(17,24,39,0.93); backdrop-filter:blur(6px); color:#fff; padding:10px 18px; border-radius:20px; font-size:14px; font-weight:600; z-index:400; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.3); display:flex; align-items:center; gap:12px; }
+  .ql-warmup-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  @media (max-width:400px) { .ql-warmup-grid { grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- AUTH OVERLAY -->
+<div id="auth-overlay" style="position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border-radius:16px;padding:32px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.12);border:1px solid var(--border)">
+    <div style="font-size:36px;text-align:center;margin-bottom:6px">💪</div>
+    <div style="font-size:20px;font-weight:700;text-align:center;margin-bottom:4px">Fitness Dashboard</div>
+    <div style="font-size:14px;color:var(--text-muted);text-align:center;margin-bottom:24px" id="auth-mode-label">Sign in to continue</div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="auth-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')handleAuth()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-input" id="auth-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuth()">
+    </div>
+    <div id="auth-error" style="font-size:13px;margin-bottom:12px;padding:10px 12px;border-radius:8px;display:none"></div>
+    <button class="btn btn-primary" onclick="handleAuth()" style="width:100%;padding:12px;font-size:15px;justify-content:center" id="auth-btn">Sign In</button>
+    <div style="text-align:center;margin-top:14px">
+      <button onclick="toggleAuthMode()" style="background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer" id="auth-toggle">Don't have an account? Sign up</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">💪 Fitness</div>
+  <div class="nav-tab active" onclick="showPage('attendance')">Attendance</div>
+  <div class="nav-tab" onclick="showPage('workouts')">Workouts</div>
+  <div class="nav-tab" onclick="showPage('metrics')">Body Metrics</div>
+  <div class="nav-tab" onclick="showPage('program')">Program</div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-left:12px;flex-shrink:0">
+    <span style="font-size:12px;color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="nav-user-email"></span>
+    <button class="btn btn-outline btn-sm" onclick="signOut()" id="nav-signout-btn" style="display:none">Sign out</button>
+  </div>
+</nav>
+
+<!-- ===== ATTENDANCE PAGE ===== -->
+<div class="page active" id="page-attendance">
+  <div class="section-header" style="margin-top:4px">
+    <div class="section-title">Gym Attendance</div>
+    <button class="btn btn-primary" onclick="toggleToday()">
+      <span id="today-btn-text">✓ Log Today</span>
+    </button>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid-3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">This Week</div>
+      <div class="stat-value" id="stat-this-week">0</div>
+      <div class="stat-sub" id="stat-week-goal-sub">of <span id="week-goal-display">4</span> days</div>
+    </div>
+    <div class="card">
+      <div class="card-title">This Month</div>
+      <div class="stat-value" id="stat-this-month">0</div>
+      <div class="stat-sub">days attended</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Current Streak</div>
+      <div style="margin-top:4px"><span class="streak-badge" id="streak-badge">🔥 0 days</span></div>
+    </div>
+  </div>
+
+  <!-- Next Workout Banner -->
+  <div class="card next-workout-card" style="margin-bottom:16px">
+    <div>
+      <div class="card-title" style="margin-bottom:4px">Next Workout</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:2px" id="next-workout-label">Day A</div>
+      <div style="font-size:13px;color:var(--text-muted)" id="next-workout-sub">—</div>
+    </div>
+    <button class="btn btn-primary" onclick="openQuickLog()" style="font-size:15px;padding:13px 22px;flex-shrink:0">▶ Start</button>
+  </div>
+
+  <!-- Weekly Goal Progress -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="card-title" style="margin-bottom:0">Weekly Goal Progress</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;color:var(--text-muted)">Goal:</span>
+        <button class="btn btn-outline btn-sm" onclick="adjustGoal(-1)">−</button>
+        <span style="font-weight:700;font-size:16px" id="goal-num">4</span>
+        <button class="btn btn-outline btn-sm" onclick="adjustGoal(1)">+</button>
+        <span style="font-size:13px;color:var(--text-muted)">days/week</span>
+      </div>
+    </div>
+    <div class="progress-bar-wrap" style="height:12px;margin:0">
+      <div class="progress-bar-fill green" id="week-progress-bar" style="width:0%"></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:6px" id="week-progress-label">0 of 4 days this week</div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="card">
+    <div class="cal-month-nav">
+      <button class="btn btn-outline btn-sm" onclick="changeMonth(-1)">← Prev</button>
+      <div class="cal-month-title" id="cal-title"></div>
+      <button class="btn btn-outline btn-sm" onclick="changeMonth(1)">Next →</button>
+    </div>
+    <div class="calendar" id="calendar">
+      <div class="cal-day-label">Sun</div>
+      <div class="cal-day-label">Mon</div>
+      <div class="cal-day-label">Tue</div>
+      <div class="cal-day-label">Wed</div>
+      <div class="cal-day-label">Thu</div>
+      <div class="cal-day-label">Fri</div>
+      <div class="cal-day-label">Sat</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px">Click any day to toggle attendance</div>
+  </div>
+</div>
+
+<!-- ===== WORKOUTS PAGE ===== -->
+<div class="page" id="page-workouts">
+  <div class="section-header" style="margin-top:4px">
+    <div class="section-title">Workout Log</div>
+    <button class="btn btn-primary" onclick="openWorkoutModal()">+ Log Workout</button>
+  </div>
+  <div id="workout-list"></div>
+</div>
+
+<!-- ===== METRICS PAGE ===== -->
+<div class="page" id="page-metrics">
+  <div class="section-header" style="margin-top:4px">
+    <div class="section-title">Body Metrics</div>
+    <button class="btn btn-primary" onclick="openMetricModal()">+ Log Entry</button>
+  </div>
+
+  <div class="inner-tabs">
+    <div class="inner-tab active" onclick="showMetricTab('weight')">Weight</div>
+    <div class="inner-tab" onclick="showMetricTab('measurements')">Measurements</div>
+  </div>
+
+  <!-- Weight Tab -->
+  <div id="metric-weight-tab">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Weight Over Time</div>
+      <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">History</div>
+      <div id="weight-history"></div>
+    </div>
+  </div>
+
+  <!-- Measurements Tab -->
+  <div id="metric-measurements-tab" style="display:none">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Measurements Over Time</div>
+      <div class="chart-wrap"><canvas id="measurementsChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">History</div>
+      <div id="measurements-history"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PROGRAM PAGE ===== -->
+<style>
+  .prog-exercise details { margin-top:8px; }
+  .prog-exercise details summary { font-size:12px; color:var(--accent); cursor:pointer; font-weight:500; list-style:none; display:inline-flex; align-items:center; gap:4px; }
+  .prog-exercise details summary::before { content:'▸'; font-size:10px; }
+  .prog-exercise details[open] summary::before { content:'▾'; }
+  .prog-exercise details p { font-size:12px; color:var(--text-muted); margin-top:6px; line-height:1.55; }
+</style>
+<div class="page" id="page-program">
+  <div class="section-header" style="margin-top:4px">
+    <div class="section-title">Your Program</div>
+    <span class="tag">Front Street PF · Full Body 3×/wk</span>
+  </div>
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">3 sets · 12 reps each. Rotate A → B → C → A… Weights shown are starting targets for 3×12 — you may need to adjust slightly down from your base-weight test.</p>
+
+  <div class="inner-tabs" id="prog-tab-row" style="width:auto;flex:1;max-width:300px">
+    <div class="inner-tab active" id="ptab-A" onclick="showProgDay('A')">Day A</div>
+    <div class="inner-tab" id="ptab-B" onclick="showProgDay('B')">Day B</div>
+    <div class="inner-tab" id="ptab-C" onclick="showProgDay('C')">Day C</div>
+  </div>
+
+  <!-- DAY A: Full Body -->
+  <div id="prog-A">
+    <div class="prog-day-label">Full Body — Push emphasis · Chest · Shoulders · Legs · Back · Core</div>
+
+    <div class="prog-exercise warmup">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/T7XE.jpg" alt="Matrix Treadmill" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Matrix Treadmill</div>
+        <div class="prog-exercise-muscle">Cardio warmup — every session</div>
+        <div class="prog-badges">
+          <span class="prog-badge prog-badge-warmup">15 min</span>
+          <span class="prog-badge">~0.62 mi · moderate pace</span>
+        </div>
+        <details><summary>How to do this</summary><p>Set speed to a comfortable walk (around 3.0–3.5 mph). Step on once it's moving, hold the side rails until you find your footing. Keep an easy pace for 15 minutes to warm up — not a cardio workout, just get the blood flowing.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/IMG_0030.jpg" alt="PF Leg Press" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Leg Press</div>
+        <div class="prog-exercise-muscle">Quads, glutes, hamstrings</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~75 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit back with your back flat against the pad. Place feet shoulder-width apart on the platform. Push until your legs are almost straight — don't lock your knees — then slowly bend back to about 90°. Feet higher on the platform hits glutes more; lower hits quads more.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://www.renewfit.com/photos/ph1671718438520.jpg" alt="PF Leg Extension" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Leg Extension</div>
+        <div class="prog-exercise-muscle">Quads — front of thigh</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~35 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit with your back against the pad and ankles hooked behind the lower roller. Extend your legs up until they're almost straight, squeezing your quads at the top. Lower slowly — don't let the weight drop. Keep the movement smooth and controlled throughout.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/IMG_0016.jpg" alt="Chest Press" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Chest Press</div>
+        <div class="prog-exercise-muscle">Chest, front shoulders, triceps</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~45 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit tall, back flat against the pad. Grip both handles at chest height, elbows slightly below shoulder level. Push straight out until arms are nearly extended, then bring back slowly. Don't let your lower back arch away from the pad.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0808-USAB-1.jpg" alt="PF Lat Pulldown" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Lat Pulldown</div>
+        <div class="prog-exercise-muscle">Lats, upper back — pulling down</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~65 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit and secure your thighs under the pad. Grip the bar slightly wider than shoulder-width. Pull the bar down toward your upper chest, driving your elbows down and back — think "elbows to your back pockets." Hold briefly at the bottom, then slowly let the bar rise back up. Keep your torso upright; don't lean way back.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0814-USAB.jpg" alt="PF Shoulder Press" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Shoulder Press</div>
+        <div class="prog-exercise-muscle">Shoulders — overhead press</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~45 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit upright, back against the pad, feet flat on the floor. Grip handles at shoulder height, palms facing forward. Press straight up until arms are nearly extended, then lower slowly back to shoulder level. Keep your core tight — don't let your lower back arch.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg" alt="PF Abdominal Crunch" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Abdominal Crunch</div>
+        <div class="prog-exercise-muscle">Core — abs</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~65 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit with your back against the pad, feet on the footrests. Grip the handles and curl your upper body forward in a crunching motion, contracting your abs at the bottom. Don't pull with your arms — the work should come from your core. Slowly return to the upright position.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0798-USAB-1.jpg" alt="PF Back Extension" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Back Extension</div>
+        <div class="prog-exercise-muscle">Lower back, glutes</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~65 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit in the machine with the pad against your lower back. Cross your arms over your chest or hold the side handles. Lean back, extending your torso against the resistance, then slowly return forward. Don't hyperextend — stop when your back is straight. Control the return; don't let the weight pull you forward fast.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0806-USAB-1.jpg" alt="PF Biceps Curl" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Biceps Curl</div>
+        <div class="prog-exercise-muscle">Biceps — front of arm</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~20 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit with your upper arms resting on the pad, palms facing up. Curl the handles up toward your shoulders, squeezing your biceps at the top. Lower slowly — don't let the weight drop. Keep your upper arms still on the pad throughout; only your forearms move.</p></details>
+      </div>
+    </div>
+  </div>
+
+  <!-- DAY B: Full Body -->
+  <div id="prog-B" style="display:none">
+    <div class="prog-day-label">Full Body — Pull emphasis · Back · Arms · Legs · Core</div>
+
+    <div class="prog-exercise warmup">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/T7XE.jpg" alt="Matrix Treadmill" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Matrix Treadmill</div>
+        <div class="prog-exercise-muscle">Cardio warmup — every session</div>
+        <div class="prog-badges">
+          <span class="prog-badge prog-badge-warmup">15 min</span>
+        </div>
+        <details><summary>How to do this</summary><p>Set speed to a comfortable walk (around 3.0–3.5 mph). Easy pace for 15 minutes — warm up, not a workout.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/IMG_0030.jpg" alt="PF Leg Press" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Leg Press</div>
+        <div class="prog-exercise-muscle">Quads, glutes, hamstrings</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~75 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Back flat against the pad, feet shoulder-width on the platform. Push until legs are almost straight, then slowly return to 90°. Don't lock your knees at the top.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0802-USAB-1.jpg" alt="PF Seated Leg Curl" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Seated Leg Curl</div>
+        <div class="prog-exercise-muscle">Hamstrings — back of thigh</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~35 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit with the lower roller pad on top of your ankles and the back pad behind your knees (adjust so your knees line up with the machine's pivot point). Curl your heels down and back underneath the seat. Squeeze briefly, then return slowly. Align knees with orange pivot point as the label says.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0809-USAB.jpg" alt="PF Seated Row" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Seated Row</div>
+        <div class="prog-exercise-muscle">Mid back, lats — horizontal pull</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~55 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Adjust the chest pad so it's comfortable. Grip the handles and sit upright. Pull toward your lower chest/stomach, squeezing your shoulder blades together at the end. Slowly extend back out. Keep your chest against the pad and torso upright throughout — don't lean or rock.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0814-USAB.jpg" alt="PF Shoulder Press" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Shoulder Press</div>
+        <div class="prog-exercise-muscle">Shoulders — overhead press</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~45 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit upright, back against the pad. Press up from shoulder height until arms are nearly extended, then lower slowly. Keep your core tight throughout.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0805-USAB-1.jpg" alt="PF Rotary Torso" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Rotary Torso</div>
+        <div class="prog-exercise-muscle">Obliques, core — rotational</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps each side</span>
+          <span class="prog-badge prog-badge-weight">~45 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit and grip the handles at chest height. Rotate your torso to one side against the resistance, then slowly return to center. Complete all reps on one side before switching. Keep your hips still — only your upper body rotates. Set up the machine so the range of motion feels comfortable, not forced.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0835-USAB.jpg" alt="PF Triceps Extension" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Triceps Extension</div>
+        <div class="prog-exercise-muscle">Triceps — back of arm</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~45 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit with the pad adjusted so your elbows line up with the machine's pivot. Grip the handles with palms facing down. Extend your arms downward until they're straight, squeezing your triceps. Slowly let them return up. Keep your elbows on the pad and your upper arms still — only forearms move.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0837-USAB.jpg" alt="PF Dependent Curl" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Dependent Curl</div>
+        <div class="prog-exercise-muscle">Biceps, back — bilateral curl</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~65 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Sit at the machine and grip both handles. Curl upward, bringing the handles toward your shoulders — both arms move together. Keep your upper arms still and your back against the pad. Lower slowly. The heavier weight compared to the isolated bicep curl is normal since both arms work simultaneously.</p></details>
+      </div>
+    </div>
+  </div>
+
+  <!-- DAY C: Full Body -->
+  <div id="prog-C" style="display:none">
+    <div class="prog-day-label">Full Body — Legs emphasis · Back · Triceps · Core</div>
+
+    <div class="prog-exercise warmup">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/T7XE.jpg" alt="Matrix Treadmill" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Matrix Treadmill</div>
+        <div class="prog-exercise-muscle">Cardio warmup — every session</div>
+        <div class="prog-badges">
+          <span class="prog-badge prog-badge-warmup">15 min</span>
+        </div>
+        <details><summary>How to do this</summary><p>Set speed to a comfortable walk (around 3.0–3.5 mph). Easy pace for 15 minutes — warm up, not a workout.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/IMG_0030.jpg" alt="PF Leg Press" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Leg Press</div>
+        <div class="prog-exercise-muscle">Quads, glutes, hamstrings</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~75 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Back flat against the pad, feet shoulder-width on the platform. Push until legs are almost straight, slowly return to 90°. Don't lock your knees.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0802-USAB-1.jpg" alt="PF Seated Leg Curl" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Seated Leg Curl</div>
+        <div class="prog-exercise-muscle">Hamstrings — back of thigh</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~35 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Adjust so knees align with the pivot. Curl heels down and back underneath the seat, squeeze briefly, return slowly.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0808-USAB-1.jpg" alt="PF Lat Pulldown" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Lat Pulldown</div>
+        <div class="prog-exercise-muscle">Lats, upper back</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~65 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Thighs secured under the pad. Pull the bar down toward your upper chest, driving elbows down. Hold briefly, then let the bar rise slowly. Stay upright.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/ZMF4005849.jpg" alt="Cable Tower Low Row" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Cable Tower — Low Row</div>
+        <div class="prog-exercise-muscle">Back, biceps — 4-sided cable tower</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~50 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Attach the handle to the low pulley on the cable tower. Sit on the bench, feet on the platform, and grip the handle. Sit upright and pull the handle toward your lower chest/stomach, squeezing your shoulder blades together. Slowly extend back out. Don't rock your torso forward and back — keep it still.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0807-USAB-1.jpg" alt="PF Triceps Press" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Triceps Press</div>
+        <div class="prog-exercise-muscle">Triceps — overhead/dip motion</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~55 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Grip the handles and push down or press — follow the machine's motion path. Keep elbows close to your sides and focus on squeezing your triceps at full extension. Slow and controlled on the way back up.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0805-USAB-1.jpg" alt="PF Rotary Torso" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Rotary Torso</div>
+        <div class="prog-exercise-muscle">Obliques, core</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps each side</span>
+          <span class="prog-badge prog-badge-weight">~45 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Rotate your torso to one side against the resistance, then slowly return to center. Hips stay still. Do all reps on one side, then switch.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg" alt="PF Abdominal Crunch" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Abdominal Crunch</div>
+        <div class="prog-exercise-muscle">Core — abs</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~65 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Grip the handles and curl your upper body forward in a crunching motion. Work from your core, not your arms. Slowly return to upright.</p></details>
+      </div>
+    </div>
+
+    <div class="prog-exercise">
+      <div class="prog-img-wrap">
+        <img src="https://images.jhtassets.com/uploads/MGM0798-USAB-1.jpg" alt="PF Back Extension" onerror="progImgErr(this)">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="prog-exercise-name">Back Extension</div>
+        <div class="prog-exercise-muscle">Lower back, glutes</div>
+        <div class="prog-badges">
+          <span class="prog-badge">3 sets</span>
+          <span class="prog-badge">12 reps</span>
+          <span class="prog-badge prog-badge-weight">~65 lbs</span>
+        </div>
+        <details><summary>How to do this</summary><p>Pad against your lower back. Lean back against the resistance until your back is straight — don't hyperextend. Return forward slowly with control.</p></details>
+      </div>
+    </div>
+  </div>
+      </div>
+    </div>
+
+
+  <!-- Weekly schedule -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Suggested weekly schedule</div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Rotate A→B→C regardless of which days you go. Any 3 non-consecutive days work great.</p>
+    <div class="prog-sched">
+      <div><div class="prog-sched-label">Mon</div><div class="prog-sched-pill" style="background:var(--accent-light);color:var(--accent)">Day A</div></div>
+      <div><div class="prog-sched-label">Tue</div><div class="prog-sched-pill" style="background:var(--bg);color:var(--text-muted)">Rest</div></div>
+      <div><div class="prog-sched-label">Wed</div><div class="prog-sched-pill" style="background:var(--accent2-light);color:var(--accent2)">Day B</div></div>
+      <div><div class="prog-sched-label">Thu</div><div class="prog-sched-pill" style="background:var(--bg);color:var(--text-muted)">Rest</div></div>
+      <div><div class="prog-sched-label">Fri</div><div class="prog-sched-pill" style="background:var(--accent3-light);color:var(--accent3)">Day C</div></div>
+      <div><div class="prog-sched-label">Sat</div><div class="prog-sched-pill" style="background:var(--bg);color:var(--text-muted)">Rest</div></div>
+      <div><div class="prog-sched-label">Sun</div><div class="prog-sched-pill" style="background:var(--bg);color:var(--text-muted)">Rest</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== QUICK-LOG OVERLAY ===== -->
+<div class="ql-overlay" id="ql-overlay" style="display:none">
+  <div class="ql-header">
+    <button class="btn btn-outline btn-sm" onclick="closeQuickLog()">✕ Exit</button>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="ql-day-label">Day A</div>
+      <div style="font-size:12px;color:var(--text-muted)" id="ql-date-label"></div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);white-space:nowrap;margin-right:4px" id="ql-progress-label">0 done</div>
+    <button class="btn btn-success btn-sm" onclick="finishQuickLog()">Save ✓</button>
+  </div>
+  <div style="padding:12px 16px;max-width:700px;margin:0 auto" id="ql-exercise-list"></div>
+</div>
+<!-- Rest timer banner -->
+<div class="ql-rest-banner" id="ql-rest-banner" style="display:none">
+  <span>🕐 Rest: <span id="ql-rest-time">1:30</span></span>
+  <button onclick="skipRestTimer()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:4px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">Skip</button>
+</div>
+
+<!-- ===== WORKOUT MODAL ===== -->
+<div class="modal-overlay" id="workout-modal">
+  <div class="modal">
+    <div class="modal-title">Log Workout</div>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input type="date" class="form-input" id="w-date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Workout Type</label>
+      <input type="text" class="form-input" id="w-type" placeholder="e.g. Push, Pull, Legs, Full Body">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Exercises</label>
+      <div id="exercise-inputs"></div>
+      <button class="btn btn-outline btn-sm" onclick="addExerciseInput()" style="margin-top:8px">+ Add Exercise</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <input type="text" class="form-input" id="w-notes" placeholder="How did it feel? PRs, energy level...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeWorkoutModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveWorkout()">Save Workout</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== METRIC MODAL ===== -->
+<div class="modal-overlay" id="metric-modal">
+  <div class="modal">
+    <div class="modal-title">Log Body Metrics</div>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input type="date" class="form-input" id="m-date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Weight (lbs)</label>
+      <input type="number" class="form-input" id="m-weight" placeholder="e.g. 145" step="0.1">
+    </div>
+    <hr class="divider">
+    <div style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:10px">Measurements (inches — optional)</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">Chest</label>
+        <input type="number" class="form-input" id="m-chest" step="0.1" placeholder="—">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Waist</label>
+        <input type="number" class="form-input" id="m-waist" step="0.1" placeholder="—">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hips</label>
+        <input type="number" class="form-input" id="m-hips" step="0.1" placeholder="—">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Arms (bicep)</label>
+        <input type="number" class="form-input" id="m-arms" step="0.1" placeholder="—">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Thighs</label>
+        <input type="number" class="form-input" id="m-thighs" step="0.1" placeholder="—">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeMetricModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMetric()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========================
+//   SUPABASE + AUTH
+// ========================
+const SUPABASE_URL  = 'https://njzlvgmjytejbwgfgcga.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qemx2Z21qeXRlamJ3Z2ZnY2dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwOTYxNjYsImV4cCI6MjA5NjY3MjE2Nn0._kDFqRr9U3YiaolE2BARt-bmkCL8G9iyinINr5zpQmA';
+const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let _authMode = 'signin';
+
+function toggleAuthMode() {
+  _authMode = _authMode === 'signin' ? 'signup' : 'signin';
+  const isSignIn = _authMode === 'signin';
+  document.getElementById('auth-btn').textContent = isSignIn ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-mode-label').textContent = isSignIn ? 'Sign in to continue' : 'Create your account';
+  document.getElementById('auth-toggle').textContent = isSignIn ? "Don't have an account? Sign up" : 'Already have an account? Sign in';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+async function handleAuth() {
+  const email    = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl    = document.getElementById('auth-error');
+  const btn      = document.getElementById('auth-btn');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Please wait…';
+  try {
+    const fn = _authMode === 'signin'
+      ? _supabase.auth.signInWithPassword({ email, password })
+      : _supabase.auth.signUp({ email, password });
+    const { data, error } = await fn;
+    if (error) throw error;
+    if (data.session) {
+      currentUser = data.session.user;
+      onAuthSuccess();
+    } else {
+      // Sign-up with email confirmation enabled
+      showAuthMsg('Check your email for a confirmation link.', 'success');
+    }
+  } catch(e) {
+    showAuthMsg(e.message || 'Authentication failed.', 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = _authMode === 'signin' ? 'Sign In' : 'Create Account';
+}
+
+function showAuthMsg(msg, type) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.style.background = type === 'error' ? 'var(--red-light)' : 'var(--accent2-light)';
+  el.style.color = type === 'error' ? 'var(--red)' : 'var(--accent2)';
+  el.style.display = 'block';
+}
+
+async function signOut() {
+  await _supabase.auth.signOut();
+  currentUser = null;
+  document.getElementById('auth-overlay').style.display = 'flex';
+  document.getElementById('nav-user-email').textContent = '';
+  document.getElementById('nav-signout-btn').style.display = 'none';
+}
+
+function onAuthSuccess() {
+  document.getElementById('auth-overlay').style.display = 'none';
+  document.getElementById('nav-user-email').textContent = currentUser.email;
+  document.getElementById('nav-signout-btn').style.display = '';
+  syncFromSupabase();
+}
+
+async function syncToSupabase(key, val) {
+  if (!currentUser) return;
+  try {
+    await _supabase.from('user_data').upsert(
+      { user_id: currentUser.id, key, value: val, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,key' }
+    );
+  } catch(e) { console.warn('Supabase write failed:', e); }
+}
+
+async function syncFromSupabase() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await _supabase.from('user_data').select('key, value');
+    if (error || !data || data.length === 0) return;
+    data.forEach(row => localStorage.setItem(row.key, JSON.stringify(row.value)));
+    // Reload in-memory state from the freshly-written localStorage
+    attendance = load(KEY_ATTENDANCE, []);
+    workouts   = load(KEY_WORKOUTS, []);
+    metrics    = load(KEY_METRICS, []);
+    weeklyGoal = load(KEY_GOAL, 4);
+    // Re-render whatever page is active
+    renderCalendar();
+    renderNextWorkoutBanner();
+    const ap = document.querySelector('.page.active');
+    if (ap) {
+      if (ap.id === 'page-workouts') renderWorkouts();
+      if (ap.id === 'page-metrics')  renderMetrics();
+    }
+  } catch(e) { console.warn('Supabase read failed:', e); }
+}
+
+// Restore session on page load / app resume
+_supabase.auth.onAuthStateChange((event, session) => {
+  if (session?.user && !currentUser) {
+    currentUser = session.user;
+    onAuthSuccess();
+  }
+});
+(async function checkSession() {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user;
+    onAuthSuccess();
+  } else {
+    document.getElementById('auth-overlay').style.display = 'flex';
+  }
+})();
+
+// ========================
+//   DATA LAYER (localStorage)
+// ========================
+const KEY_ATTENDANCE = 'fit_attendance';
+const KEY_WORKOUTS   = 'fit_workouts';
+const KEY_METRICS    = 'fit_metrics';
+const KEY_GOAL       = 'fit_weekly_goal';
+
+function load(key, def) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? def; } catch { return def; }
+}
+function save(key, val) {
+  localStorage.setItem(key, JSON.stringify(val));
+  syncToSupabase(key, val); // fire-and-forget background sync
+}
+
+let attendance = load(KEY_ATTENDANCE, []);  // array of "YYYY-MM-DD" strings
+let workouts   = load(KEY_WORKOUTS, []);    // array of workout objects
+let metrics    = load(KEY_METRICS, []);     // array of metric objects
+let weeklyGoal = load(KEY_GOAL, 4);
+
+// ========================
+//   FIRST-RUN: log today's base-weight session (Jun 9 2026)
+(function() {
+  var d = '2026-06-09';
+  if (!attendance.includes(d)) {
+    attendance.push(d);
+    save(KEY_ATTENDANCE, attendance);
+  }
+  workouts = workouts.filter(function(w){ return w.date !== d || (w.exercises.length > 0 && typeof w.exercises[0] === 'object'); });
+  if (!workouts.some(function(w){ return w.date === d; })) {
+    workouts.unshift({
+      id: 1749513600000,
+      date: d,
+      type: 'Full Body — Base Weight Test',
+      exercises: [
+        { name: 'Treadmill warmup', machine: '15:03 min · 0.62 mi · 136 BPM · 129 cal' },
+        { name: 'Abdominal Crunch', sets: 2, reps: 10, weight: 70 },
+        { name: 'Leg Press', sets: 2, reps: 10, weight: 80 },
+        { name: 'Leg Extension', sets: 2, reps: 10, weight: 40 },
+        { name: 'Lat Pulldown', sets: 2, reps: 10, weight: 70 },
+        { name: 'Biceps Curl', sets: 2, reps: 10, weight: 20 },
+        { name: 'Dependent Curl', sets: 2, reps: 10, weight: 70 },
+        { name: 'Triceps Extension', sets: 2, reps: 10, weight: 50 },
+        { name: 'Triceps Press', sets: 2, reps: 10, weight: 60 },
+        { name: 'Back Extension', sets: 2, reps: 10, weight: 70 },
+        { name: 'Seated Row', sets: 2, reps: 10, weight: 60 },
+        { name: 'Chest Press', sets: 2, reps: 10, weight: 50 },
+        { name: 'Shoulder Press', sets: 2, reps: 10, weight: 50 },
+        { name: 'Seated Leg Curl', sets: 2, reps: 10, weight: 40 },
+        { name: 'Rotary Torso', sets: 2, reps: 10, weight: 50 },
+        { name: 'Cable Tower — Low Row', sets: 2, reps: 10, weight: 55 },
+        { name: 'Cable Tower — Overhead', sets: 2, reps: 10, weight: 55 }
+      ],
+      notes: 'Front Street PF — base weight test day. Hit every machine to establish starting weights for 3×12 program.'
+    });
+    save(KEY_WORKOUTS, workouts);
+  }
+})();
+
+// ========================
+//   PROGRAM DATA
+// ========================
+const PROGRAM = {
+  A: {
+    label: 'Day A', desc: 'Push emphasis · Chest · Shoulders · Legs · Core',
+    color: '#6366f1', colorLight: '#eef2ff',
+    exercises: [
+      { name: 'Treadmill', isWarmup: true, note: '15 min walk', img: 'https://images.jhtassets.com/uploads/T7XE.jpg' },
+      { name: 'Leg Press', sets: 3, reps: 12, weight: 75, img: 'https://images.jhtassets.com/uploads/IMG_0030.jpg' },
+      { name: 'Leg Extension', sets: 3, reps: 12, weight: 35, img: 'https://www.renewfit.com/photos/ph1671718438520.jpg' },
+      { name: 'Chest Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/IMG_0016.jpg' },
+      { name: 'Lat Pulldown', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0808-USAB-1.jpg' },
+      { name: 'Shoulder Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0814-USAB.jpg' },
+      { name: 'Abdominal Crunch', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
+      { name: 'Back Extension', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0798-USAB-1.jpg' },
+      { name: 'Biceps Curl', sets: 3, reps: 12, weight: 20, img: 'https://images.jhtassets.com/uploads/MGM0806-USAB-1.jpg' },
+    ]
+  },
+  B: {
+    label: 'Day B', desc: 'Pull emphasis · Back · Arms · Legs · Core',
+    color: '#10b981', colorLight: '#ecfdf5',
+    exercises: [
+      { name: 'Treadmill', isWarmup: true, note: '15 min walk', img: 'https://images.jhtassets.com/uploads/T7XE.jpg' },
+      { name: 'Leg Press', sets: 3, reps: 12, weight: 75, img: 'https://images.jhtassets.com/uploads/IMG_0030.jpg' },
+      { name: 'Seated Leg Curl', sets: 3, reps: 12, weight: 35, img: 'https://images.jhtassets.com/uploads/MGM0802-USAB-1.jpg' },
+      { name: 'Seated Row', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/MGM0809-USAB.jpg' },
+      { name: 'Shoulder Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0814-USAB.jpg' },
+      { name: 'Rotary Torso', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0805-USAB-1.jpg' },
+      { name: 'Triceps Extension', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0835-USAB.jpg' },
+      { name: 'Dependent Curl', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0837-USAB.jpg' },
+    ]
+  },
+  C: {
+    label: 'Day C', desc: 'Legs emphasis · Back · Triceps · Core',
+    color: '#f59e0b', colorLight: '#fffbeb',
+    exercises: [
+      { name: 'Treadmill', isWarmup: true, note: '15 min walk', img: 'https://images.jhtassets.com/uploads/T7XE.jpg' },
+      { name: 'Leg Press', sets: 3, reps: 12, weight: 75, img: 'https://images.jhtassets.com/uploads/IMG_0030.jpg' },
+      { name: 'Seated Leg Curl', sets: 3, reps: 12, weight: 35, img: 'https://images.jhtassets.com/uploads/MGM0802-USAB-1.jpg' },
+      { name: 'Lat Pulldown', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0808-USAB-1.jpg' },
+      { name: 'Cable Tower — Low Row', sets: 3, reps: 12, weight: 50, img: 'https://images.jhtassets.com/uploads/ZMF4005849.jpg' },
+      { name: 'Triceps Press', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/MGM0807-USAB-1.jpg' },
+      { name: 'Rotary Torso', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0805-USAB-1.jpg' },
+      { name: 'Abdominal Crunch', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
+      { name: 'Back Extension', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0798-USAB-1.jpg' },
+    ]
+  }
+};
+
+// ========================
+//   DAY ROTATION + PROGRESSION
+// ========================
+function getNextWorkoutDay() {
+  const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date));
+  for (const w of sorted) {
+    if (!w.type) continue;
+    if (w.type.includes('Day A')) return 'B';
+    if (w.type.includes('Day B')) return 'C';
+    if (w.type.includes('Day C')) return 'A';
+  }
+  return 'A'; // no labeled workout yet → start with A
+}
+
+function getLastLoggedWeight(exerciseName) {
+  const name = exerciseName.toLowerCase().trim();
+  const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date));
+  for (const w of sorted) {
+    for (const e of (w.exercises || [])) {
+      const ex = typeof e === 'string' ? { name: e } : e;
+      if (ex.name && ex.name.toLowerCase().trim() === name && ex.weight) {
+        return { weight: parseFloat(ex.weight), date: w.date };
+      }
+    }
+  }
+  return null;
+}
+
+function getProgressionStatus(exerciseName) {
+  const name = exerciseName.toLowerCase().trim();
+  const sorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date));
+  const sessions = [];
+  for (const w of sorted) {
+    const found = (w.exercises || []).find(e => {
+      const obj = typeof e === 'string' ? { name: e } : e;
+      return obj.name && obj.name.toLowerCase().trim() === name;
+    });
+    if (!found) continue;
+    const obj = typeof found === 'string' ? { name: found } : found;
+    if (!obj.weight) continue;
+    sessions.push({ weight: parseFloat(obj.weight), sets: parseInt(obj.sets) || 0, reps: parseInt(obj.reps) || 0 });
+    if (sessions.length >= 5) break;
+  }
+  if (sessions.length === 0) return { ready: false, currentWeight: null, nextWeight: null, sessionsAt: 0 };
+  const currentWeight = sessions[0].weight;
+  let sessionsAt = 0;
+  for (const s of sessions) {
+    if (s.weight !== currentWeight) break;
+    if (s.sets >= 3 && s.reps >= 12) sessionsAt++;
+    else break;
+  }
+  const increment = currentWeight <= 25 ? 2.5 : 5;
+  const ready = sessionsAt >= 3;
+  return { ready, currentWeight, nextWeight: ready ? currentWeight + increment : null, sessionsAt };
+}
+
+function renderNextWorkoutBanner() {
+  const day = getNextWorkoutDay();
+  const prog = PROGRAM[day];
+  const labelEl = document.getElementById('next-workout-label');
+  const subEl = document.getElementById('next-workout-sub');
+  if (!labelEl || !subEl) return;
+  labelEl.textContent = prog.label;
+  labelEl.style.color = prog.color;
+  const count = prog.exercises.filter(e => !e.isWarmup).length;
+  subEl.textContent = prog.desc + ' · ' + count + ' exercises';
+}
+
+function renderProgramWithLiveWeights() {
+  document.querySelectorAll('.prog-exercise').forEach(card => {
+    const nameEl = card.querySelector('.prog-exercise-name');
+    if (!nameEl) return;
+    const name = nameEl.textContent.trim();
+    card.querySelectorAll('.prog-live-badge').forEach(b => b.remove());
+    const badges = card.querySelector('.prog-badges');
+    if (!badges) return;
+    const p = getProgressionStatus(name);
+    if (p.ready && p.nextWeight) {
+      const badge = document.createElement('span');
+      badge.className = 'prog-badge prog-live-badge';
+      badge.style.cssText = 'background:#dcfce7;color:#166534;border-color:#bbf7d0;font-weight:700';
+      badge.textContent = '↑ Try ' + p.nextWeight + ' lbs';
+      badges.appendChild(badge);
+    } else if (p.currentWeight) {
+      const badge = document.createElement('span');
+      badge.className = 'prog-badge prog-live-badge';
+      badge.style.cssText = 'background:var(--accent-light);color:var(--accent);border-color:var(--accent-light)';
+      badge.textContent = 'Last: ' + p.currentWeight + ' lbs';
+      badges.appendChild(badge);
+    }
+  });
+}
+
+// ========================
+//   NAVIGATION
+// ========================
+let calYear, calMonth;
+const now = new Date();
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event.target.classList.add('active');
+  if (id === 'attendance') { renderCalendar(); renderNextWorkoutBanner(); }
+  if (id === 'workouts') renderWorkouts();
+  if (id === 'metrics') renderMetrics();
+  if (id === 'program') renderProgramWithLiveWeights();
+}
+
+// ========================
+//   ATTENDANCE
+// ========================
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function toggleToday() {
+  const today = todayStr();
+  if (attendance.includes(today)) {
+    attendance = attendance.filter(d => d !== today);
+  } else {
+    attendance.push(today);
+  }
+  save(KEY_ATTENDANCE, attendance);
+  renderCalendar();
+  updateTodayButton();
+}
+
+function toggleDay(dateStr) {
+  if (attendance.includes(dateStr)) {
+    attendance = attendance.filter(d => d !== dateStr);
+  } else {
+    attendance.push(dateStr);
+  }
+  save(KEY_ATTENDANCE, attendance);
+  renderCalendar();
+  updateTodayButton();
+}
+
+function updateTodayButton() {
+  const today = todayStr();
+  const btn = document.getElementById('today-btn-text');
+  if (attendance.includes(today)) {
+    btn.textContent = '✓ Logged Today';
+  } else {
+    btn.textContent = '+ Log Today';
+  }
+}
+
+function adjustGoal(delta) {
+  weeklyGoal = Math.max(1, Math.min(7, weeklyGoal + delta));
+  save(KEY_GOAL, weeklyGoal);
+  document.getElementById('goal-num').textContent = weeklyGoal;
+  document.getElementById('week-goal-display').textContent = weeklyGoal;
+  updateWeekStats();
+}
+
+function getWeekStart(d) {
+  const day = new Date(d);
+  day.setHours(0,0,0,0);
+  day.setDate(day.getDate() - day.getDay());
+  return day;
+}
+
+function updateWeekStats() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekStart = getWeekStart(today);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
+
+  const thisWeek = attendance.filter(d => {
+    const day = new Date(d);
+    return day >= weekStart && day < weekEnd;
+  }).length;
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const thisMonth = attendance.filter(d => new Date(d) >= monthStart && new Date(d) <= today).length;
+
+  // streak
+  let streak = 0;
+  let check = new Date(today);
+  while (true) {
+    const s = check.getFullYear() + '-' + String(check.getMonth()+1).padStart(2,'0') + '-' + String(check.getDate()).padStart(2,'0');
+    if (attendance.includes(s)) { streak++; check.setDate(check.getDate()-1); }
+    else break;
+  }
+
+  document.getElementById('stat-this-week').textContent = thisWeek;
+  document.getElementById('stat-this-month').textContent = thisMonth;
+  document.getElementById('streak-badge').textContent = '🔥 ' + streak + (streak === 1 ? ' day' : ' days');
+  document.getElementById('goal-num').textContent = weeklyGoal;
+  document.getElementById('week-goal-display').textContent = weeklyGoal;
+
+  const pct = Math.min(100, Math.round((thisWeek / weeklyGoal) * 100));
+  document.getElementById('week-progress-bar').style.width = pct + '%';
+  document.getElementById('week-progress-label').textContent = thisWeek + ' of ' + weeklyGoal + ' days this week';
+}
+
+function changeMonth(delta) {
+  calMonth += delta;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  calYear = calYear ?? now.getFullYear();
+  calMonth = calMonth ?? now.getMonth();
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = monthNames[calMonth] + ' ' + calYear;
+
+  const cal = document.getElementById('calendar');
+  // Remove day cells (keep day labels = first 7)
+  while (cal.children.length > 7) cal.removeChild(cal.lastChild);
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const todayS = todayStr();
+
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    cal.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    if (dateStr === todayS) el.classList.add('today');
+    if (attendance.includes(dateStr)) el.classList.add('attended');
+    el.textContent = d;
+    el.onclick = () => toggleDay(dateStr);
+    cal.appendChild(el);
+  }
+
+  updateWeekStats();
+  updateTodayButton();
+}
+
+// ========================
+//   WORKOUTS
+// ========================
+function openWorkoutModal() {
+  document.getElementById('w-date').value = todayStr();
+  document.getElementById('w-type').value = '';
+  document.getElementById('w-notes').value = '';
+  document.getElementById('exercise-inputs').innerHTML = '';
+  addExerciseInput();
+  document.getElementById('workout-modal').classList.add('open');
+}
+function closeWorkoutModal() { document.getElementById('workout-modal').classList.remove('open'); }
+
+function addExerciseInput() {
+  const wrap = document.createElement('div');
+  wrap.className = 'form-row';
+  wrap.style.cssText = 'margin-bottom:8px;flex-wrap:wrap;';
+  wrap.innerHTML = `
+    <div class="form-group" style="flex:2;min-width:120px">
+      <input type="text" class="form-input ex-name" placeholder="Exercise name">
+    </div>
+    <div class="form-group" style="min-width:110px;flex:1.5">
+      <input type="text" class="form-input ex-machine" placeholder="Machine (e.g. Matrix)">
+    </div>
+    <div class="form-group" style="width:56px;flex:none">
+      <input type="text" class="form-input ex-sets" placeholder="Sets">
+    </div>
+    <div class="form-group" style="width:56px;flex:none">
+      <input type="text" class="form-input ex-reps" placeholder="Reps">
+    </div>
+    <div class="form-group" style="width:64px;flex:none">
+      <input type="text" class="form-input ex-weight" placeholder="lbs">
+    </div>
+    <button class="btn btn-danger" onclick="this.parentElement.remove()" style="margin-top:0;align-self:center">✕</button>
+  `;
+  document.getElementById('exercise-inputs').appendChild(wrap);
+}
+
+function saveWorkout() {
+  const date = document.getElementById('w-date').value;
+  const type = document.getElementById('w-type').value.trim();
+  const notes = document.getElementById('w-notes').value.trim();
+  if (!date) { alert('Please select a date.'); return; }
+
+  const exercises = [];
+  document.querySelectorAll('#exercise-inputs .form-row').forEach(row => {
+    const name    = row.querySelector('.ex-name').value.trim();
+    const machine = row.querySelector('.ex-machine').value.trim();
+    const sets    = row.querySelector('.ex-sets').value.trim();
+    const reps    = row.querySelector('.ex-reps').value.trim();
+    const weight  = row.querySelector('.ex-weight').value.trim();
+    if (name) exercises.push({ name, machine, sets, reps, weight });
+  });
+
+  workouts.unshift({ id: Date.now(), date, type, exercises, notes });
+  save(KEY_WORKOUTS, workouts);
+  closeWorkoutModal();
+  renderWorkouts();
+}
+
+function deleteWorkout(id) {
+  if (!confirm('Delete this workout?')) return;
+  workouts = workouts.filter(w => w.id !== id);
+  save(KEY_WORKOUTS, workouts);
+  renderWorkouts();
+}
+
+function renderWorkouts() {
+  const el = document.getElementById('workout-list');
+  if (workouts.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🏋️</div>No workouts logged yet.<br>Hit "+ Log Workout" to get started!</div>';
+    return;
+  }
+
+  const grouped = {};
+  workouts.forEach(w => {
+    const month = w.date.slice(0,7);
+    if (!grouped[month]) grouped[month] = [];
+    grouped[month].push(w);
+  });
+
+  el.innerHTML = '';
+  Object.keys(grouped).sort().reverse().forEach(month => {
+    const [y, m] = month.split('-');
+    const monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+    const header = document.createElement('div');
+    header.style = 'font-size:13px;font-weight:600;color:var(--text-muted);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.05em;';
+    header.textContent = monthNames[parseInt(m)] + ' ' + y;
+    el.appendChild(header);
+
+    grouped[month].forEach(w => {
+      const card = document.createElement('div');
+      card.className = 'session-card';
+      const exHTML = w.exercises.map(e => {
+        const ex = (typeof e === 'string') ? { name: e } : e;
+        return `<div class="exercise-row">
+          <span class="exercise-name">${ex.name}</span>
+          ${ex.machine ? `<span class="exercise-badge" style="color:var(--accent);border-color:var(--accent-light);background:var(--accent-light)">${ex.machine}</span>` : ''}
+          ${ex.sets ? `<span class="exercise-badge">${ex.sets} sets</span>` : ''}
+          ${ex.reps ? `<span class="exercise-badge">${ex.reps} reps</span>` : ''}
+          ${ex.weight ? `<span class="exercise-badge">${ex.weight} lbs</span>` : ''}
+        </div>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <span class="session-date">${formatDateDisplay(w.date)}</span>
+            ${w.type ? `<span class="tag" style="margin-left:8px">${w.type}</span>` : ''}
+          </div>
+          <button class="btn btn-danger" onclick="deleteWorkout(${w.id})">Delete</button>
+        </div>
+        ${exHTML || '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">No exercises logged</div>'}
+        ${w.notes ? `<div class="session-notes">"${w.notes}"</div>` : ''}
+      `;
+      el.appendChild(card);
+    });
+  });
+}
+
+// ========================
+//   METRICS
+// ========================
+let activeMetricTab = 'weight';
+let weightChart, measChart;
+
+function showMetricTab(tab) {
+  activeMetricTab = tab;
+  document.querySelectorAll('.inner-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && tab === 'weight') || (i === 1 && tab === 'measurements'));
+  });
+  document.getElementById('metric-weight-tab').style.display = tab === 'weight' ? '' : 'none';
+  document.getElementById('metric-measurements-tab').style.display = tab === 'measurements' ? '' : 'none';
+  renderMetrics();
+}
+
+function openMetricModal() {
+  document.getElementById('m-date').value = todayStr();
+  ['m-weight','m-chest','m-waist','m-hips','m-arms','m-thighs'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('metric-modal').classList.add('open');
+}
+function closeMetricModal() { document.getElementById('metric-modal').classList.remove('open'); }
+
+function saveMetric() {
+  const date = document.getElementById('m-date').value;
+  if (!date) { alert('Please select a date.'); return; }
+  const weight = parseFloat(document.getElementById('m-weight').value) || null;
+  const chest  = parseFloat(document.getElementById('m-chest').value) || null;
+  const waist  = parseFloat(document.getElementById('m-waist').value) || null;
+  const hips   = parseFloat(document.getElementById('m-hips').value) || null;
+  const arms   = parseFloat(document.getElementById('m-arms').value) || null;
+  const thighs = parseFloat(document.getElementById('m-thighs').value) || null;
+
+  // Remove existing entry for same date
+  metrics = metrics.filter(m => m.date !== date);
+  metrics.push({ date, weight, chest, waist, hips, arms, thighs });
+  metrics.sort((a,b) => a.date.localeCompare(b.date));
+  save(KEY_METRICS, metrics);
+  closeMetricModal();
+  renderMetrics();
+}
+
+function deleteMetric(date) {
+  if (!confirm('Delete this entry?')) return;
+  metrics = metrics.filter(m => m.date !== date);
+  save(KEY_METRICS, metrics);
+  renderMetrics();
+}
+
+function renderMetrics() {
+  renderWeightTab();
+  renderMeasurementsTab();
+}
+
+function renderWeightTab() {
+  const entries = metrics.filter(m => m.weight != null).sort((a,b) => a.date.localeCompare(b.date));
+
+  // Chart
+  const ctx = document.getElementById('weightChart').getContext('2d');
+  if (weightChart) weightChart.destroy();
+  weightChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: entries.map(e => formatDateShort(e.date)),
+      datasets: [{
+        label: 'Weight (lbs)',
+        data: entries.map(e => e.weight),
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.1)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#6366f1',
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 12 } } },
+        x: { grid: { display: false }, ticks: { font: { size: 12 } } }
+      }
+    }
+  });
+
+  // History
+  const hist = document.getElementById('weight-history');
+  if (entries.length === 0) {
+    hist.innerHTML = '<div class="empty-state"><div class="empty-icon">⚖️</div>No weight entries yet.</div>';
+    return;
+  }
+
+  hist.innerHTML = '';
+  [...entries].reverse().forEach((e, i, arr) => {
+    const prev = arr[i+1];
+    let deltaHTML = '';
+    if (prev && prev.weight) {
+      const diff = (e.weight - prev.weight).toFixed(1);
+      const cls = diff < 0 ? 'delta-down' : diff > 0 ? 'delta-up' : 'delta-neutral';
+      deltaHTML = `<span class="metric-delta ${cls}">${diff > 0 ? '+' : ''}${diff} lbs</span>`;
+    }
+    const row = document.createElement('div');
+    row.className = 'metric-entry';
+    row.innerHTML = `
+      <span class="metric-date">${formatDateDisplay(e.date)}</span>
+      <span class="metric-val">${e.weight} lbs</span>
+      ${deltaHTML}
+      <button class="btn btn-danger" onclick="deleteMetric('${e.date}')">✕</button>
+    `;
+    hist.appendChild(row);
+  });
+}
+
+function renderMeasurementsTab() {
+  const fields = ['chest','waist','hips','arms','thighs'];
+  const labels = { chest:'Chest', waist:'Waist', hips:'Hips', arms:'Arms', thighs:'Thighs' };
+  const colors = { chest:'#6366f1', waist:'#10b981', hips:'#f59e0b', arms:'#ef4444', thighs:'#8b5cf6' };
+
+  const entries = metrics.filter(m => fields.some(f => m[f] != null)).sort((a,b) => a.date.localeCompare(b.date));
+
+  const ctx2 = document.getElementById('measurementsChart').getContext('2d');
+  if (measChart) measChart.destroy();
+  measChart = new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: entries.map(e => formatDateShort(e.date)),
+      datasets: fields.map(f => ({
+        label: labels[f],
+        data: entries.map(e => e[f] ?? null),
+        borderColor: colors[f],
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        pointRadius: 4,
+        spanGaps: true,
+        pointBackgroundColor: colors[f],
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { font: { size: 12 }, boxWidth: 12 } } },
+      scales: {
+        y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 12 } } },
+        x: { grid: { display: false }, ticks: { font: { size: 12 } } }
+      }
+    }
+  });
+
+  const hist = document.getElementById('measurements-history');
+  if (entries.length === 0) {
+    hist.innerHTML = '<div class="empty-state"><div class="empty-icon">📏</div>No measurements logged yet.</div>';
+    return;
+  }
+
+  hist.innerHTML = '';
+  [...entries].reverse().forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'metric-entry';
+    const vals = fields.filter(f => e[f] != null).map(f => `<span style="font-size:13px;color:var(--text-muted)">${labels[f]}: </span><span style="font-weight:600;font-size:14px">${e[f]}"</span>`).join('&nbsp;&nbsp;');
+    row.innerHTML = `
+      <span class="metric-date">${formatDateDisplay(e.date)}</span>
+      <span>${vals || '—'}</span>
+      <button class="btn btn-danger" onclick="deleteMetric('${e.date}')">✕</button>
+    `;
+    hist.appendChild(row);
+  });
+}
+
+// ========================
+//   HELPERS
+// ========================
+function formatDateDisplay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[m-1] + ' ' + d + ', ' + y;
+}
+function formatDateShort(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[m-1] + ' ' + d;
+}
+
+// ========================
+//   PROGRAM PAGE
+// ========================
+function showProgDay(id) {
+  ['A','B','C'].forEach(function(pid) {
+    document.getElementById('prog-' + pid).style.display = pid === id ? '' : 'none';
+    var tab = document.getElementById('ptab-' + pid);
+    tab.classList.toggle('active', pid === id);
+  });
+}
+
+function progImgErr(img) {
+  img.parentNode.innerHTML = '<span class="prog-no-img">no photo</span>';
+}
+
+// ========================
+//   QUICK-LOG
+// ========================
+let qlState = null;
+let restTimerInterval = null;
+
+const CARDIO_OPTIONS = ['Treadmill', 'Elliptical', 'Stationary Bike', 'Stair Climber', 'Rowing Machine'];
+
+function openQuickLog() {
+  const day = getNextWorkoutDay();
+  const prog = PROGRAM[day];
+  qlState = {
+    day,
+    exercises: prog.exercises.map(ex => {
+      if (ex.isWarmup) {
+        return { ...ex, expanded: false, done: false, showingSwap: false, warmupData: { duration: '15', distance: '', bpm: '', cal: '' } };
+      }
+      const p = getProgressionStatus(ex.name);
+      const useWeight = p.currentWeight || ex.weight;
+      const suggestedWeight = p.ready ? p.nextWeight : useWeight;
+      return {
+        ...ex, expanded: false, done: false, showingSwap: false, progression: p,
+        setLogs: Array.from({ length: ex.sets }, () => ({ weight: suggestedWeight, reps: ex.reps, logged: false }))
+      };
+    })
+  };
+  document.getElementById('ql-overlay').style.display = 'block';
+  document.getElementById('ql-day-label').textContent = prog.label + ' · ' + prog.desc;
+  document.getElementById('ql-day-label').style.color = prog.color;
+  document.getElementById('ql-date-label').textContent = formatDateDisplay(todayStr());
+  // Auto-expand first exercise
+  qlState.exercises[0].expanded = true;
+  renderQLExercises();
+  updateQLProgress();
+  document.getElementById('ql-overlay').scrollTop = 0;
+}
+
+function closeQuickLog() {
+  const hasData = qlState && qlState.exercises.some(e => e.done || (e.setLogs && e.setLogs.some(s => s.logged)));
+  if (hasData && !confirm('Exit workout? Unsaved progress will be lost.')) return;
+  document.getElementById('ql-overlay').style.display = 'none';
+  skipRestTimer();
+  qlState = null;
+}
+
+function renderQLExercises() {
+  const list = document.getElementById('ql-exercise-list');
+  list.innerHTML = '';
+  qlState.exercises.forEach((ex, i) => {
+    const card = document.createElement('div');
+    card.id = 'ql-card-' + i;
+    let cardClass = 'ql-card';
+    if (ex.done) cardClass += ' done';
+    else if (ex.expanded) cardClass += ' expanded';
+    card.className = cardClass;
+
+    // Status dot
+    let dotClass = 'ql-status-dot';
+    let dotContent = (i + 1) + '';
+    if (ex.done) { dotClass += ' complete'; dotContent = '✓'; }
+    else if (!ex.isWarmup && ex.setLogs && ex.setLogs.some(s => s.logged)) dotClass += ' in-progress';
+
+    // Extra badge (progression or last weight)
+    let extraBadge = '';
+    if (!ex.isWarmup && ex.progression) {
+      const p = ex.progression;
+      if (p.ready && p.nextWeight) {
+        extraBadge = `<span class="ql-progression-badge">↑ Try ${p.nextWeight} lbs</span>`;
+      } else if (p.currentWeight) {
+        extraBadge = `<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0">Last: ${p.currentWeight} lbs</span>`;
+      }
+    }
+
+    const subText = ex.isWarmup ? ex.note : `${ex.sets} × ${ex.reps} · plan ${ex.weight} lbs`;
+    const doneLabel = ex.done ? ' <span style="color:var(--accent2);font-size:13px">✓</span>' : '';
+    const swapBtn = !ex.done ? `<button onclick="qlToggleSwap(${i},event)" style="background:${ex.showingSwap?'var(--accent-light)':'transparent'};color:${ex.showingSwap?'var(--accent)':'var(--text-muted)'};border:1px solid var(--border);padding:5px 9px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:4px" title="Swap exercise">↔</button>` : '';
+
+    // Swap panel (shown at top of card body)
+    let swapPanel = '';
+    if (ex.showingSwap) {
+      if (ex.isWarmup) {
+        const opts = CARDIO_OPTIONS.map(n =>
+          `<button onclick="qlApplySwap(${i},'${n}')" style="background:${ex.name===n?'var(--accent)':'var(--bg)'};color:${ex.name===n?'#fff':'var(--text)'};border:1px solid ${ex.name===n?'var(--accent)':'var(--border)'};padding:8px 12px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">${n}</button>`
+        ).join('');
+        swapPanel = `<div style="padding:10px 0 12px;border-bottom:1px solid var(--border);margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Replace warmup with:</div><div style="display:flex;flex-wrap:wrap;gap:6px">${opts}</div></div>`;
+      } else {
+        const exList = getProgramExerciseList();
+        const opts = exList.map(n => `<option value="${n}"${n === ex.name ? ' selected' : ''}>${n}</option>`).join('');
+        swapPanel = `<div style="padding:10px 0 12px;border-bottom:1px solid var(--border);margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Replace with:</div><div style="display:flex;gap:8px"><select id="ql-swap-${i}" class="form-input" style="flex:1">${opts}</select><button onclick="qlApplySwap(${i})" class="btn btn-primary btn-sm">Apply</button></div></div>`;
+      }
+    }
+
+    // Build body
+    let bodyHTML = '';
+    if (ex.isWarmup) {
+      const d = ex.warmupData;
+      bodyHTML = swapPanel + `
+        <div class="ql-warmup-grid" style="padding-top:10px">
+          <div>
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Duration (min)</label>
+            <input class="ql-num-input" style="width:100%" id="ql-warmup-dur-${i}" value="${d.duration}" type="text" placeholder="15">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Distance (mi)</label>
+            <input class="ql-num-input" style="width:100%" id="ql-warmup-dist-${i}" value="${d.distance}" type="text" placeholder="0.62">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Avg BPM</label>
+            <input class="ql-num-input" style="width:100%" id="ql-warmup-bpm-${i}" value="${d.bpm}" type="text" placeholder="136">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Calories</label>
+            <input class="ql-num-input" style="width:100%" id="ql-warmup-cal-${i}" value="${d.cal}" type="text" placeholder="129">
+          </div>
+        </div>
+        <button class="ql-log-btn warmup-done" onclick="qlDoneWarmup(${i})">Warmup Done ✓</button>`;
+    } else {
+      const rows = ex.setLogs.map((s, si) => `
+        <div class="ql-set-row" style="${s.logged ? 'opacity:0.55' : ''}">
+          <span class="ql-set-label">Set ${si + 1}</span>
+          <input class="ql-num-input" id="ql-w-${i}-${si}" value="${s.weight}" type="number" step="2.5" min="0" ${s.logged ? 'disabled' : ''}>
+          <span class="ql-set-unit">lbs ×</span>
+          <input class="ql-num-input" id="ql-r-${i}-${si}" value="${s.reps}" type="number" min="1" ${s.logged ? 'disabled' : ''}>
+          <span class="ql-set-unit">reps</span>
+          ${s.logged
+            ? `<span style="margin-left:auto;font-size:20px;color:var(--accent2)">✓</span>`
+            : `<button class="ql-log-btn" onclick="qlLogSet(${i},${si})">Log ✓</button>`
+          }
+        </div>`).join('');
+      bodyHTML = swapPanel + `<div style="padding-top:2px">${rows}</div>`;
+    }
+
+    card.innerHTML = `
+      <div class="ql-card-header" onclick="qlToggle(${i})">
+        <div class="${dotClass}">${dotContent}</div>
+        <img class="ql-card-img" src="${ex.img}" onerror="this.style.display='none'" alt="">
+        <div style="flex:1;min-width:0">
+          <div class="ql-card-name">${ex.name}${doneLabel}</div>
+          <div class="ql-card-sub">${subText}</div>
+        </div>
+        ${extraBadge}
+        ${swapBtn}
+      </div>
+      <div class="ql-card-body" ${ex.expanded && !ex.done ? '' : 'style="display:none"'}>${bodyHTML}</div>`;
+    list.appendChild(card);
+  });
+}
+
+function qlToggle(idx) {
+  if (!qlState || qlState.exercises[idx].done) return;
+  qlState.exercises[idx].expanded = !qlState.exercises[idx].expanded;
+  renderQLExercises();
+}
+
+function getProgramExerciseList() {
+  const seen = new Set();
+  const list = [];
+  ['A','B','C'].forEach(day => {
+    PROGRAM[day].exercises.forEach(ex => {
+      if (!ex.isWarmup && !seen.has(ex.name)) { seen.add(ex.name); list.push(ex.name); }
+    });
+  });
+  return list.sort();
+}
+
+function qlToggleSwap(idx, event) {
+  event.stopPropagation();
+  const ex = qlState.exercises[idx];
+  ex.showingSwap = !ex.showingSwap;
+  if (!ex.expanded) ex.expanded = true;
+  renderQLExercises();
+}
+
+function qlApplySwap(idx, name) {
+  const ex = qlState.exercises[idx];
+  const el = document.getElementById('ql-swap-' + idx);
+  const newName = name || (el && el.value.trim());
+  if (!newName) return;
+  ex.name = newName;
+  ex.showingSwap = false;
+  if (!ex.isWarmup) {
+    ex.progression = getProgressionStatus(newName);
+    const p = ex.progression;
+    const useWeight = p.currentWeight || ex.weight;
+    const suggested = p.ready ? p.nextWeight : useWeight;
+    ex.setLogs.forEach(s => { if (!s.logged) s.weight = suggested; });
+  }
+  renderQLExercises();
+}
+
+function qlLogSet(exIdx, setIdx) {
+  const ex = qlState.exercises[exIdx];
+  const wEl = document.getElementById('ql-w-' + exIdx + '-' + setIdx);
+  const rEl = document.getElementById('ql-r-' + exIdx + '-' + setIdx);
+  const weight = parseFloat(wEl.value) || ex.setLogs[setIdx].weight;
+  const reps = parseInt(rEl.value) || ex.setLogs[setIdx].reps;
+  ex.setLogs[setIdx] = { weight, reps, logged: true };
+  // Pre-fill next set
+  if (setIdx + 1 < ex.setLogs.length && !ex.setLogs[setIdx + 1].logged) {
+    ex.setLogs[setIdx + 1].weight = weight;
+  }
+  // Check completion
+  if (ex.setLogs.every(s => s.logged)) {
+    ex.done = true;
+    ex.expanded = false;
+    // Auto-open next incomplete exercise
+    const nextIdx = qlState.exercises.findIndex((e, i) => i > exIdx && !e.done);
+    if (nextIdx !== -1) {
+      qlState.exercises[nextIdx].expanded = true;
+    }
+  }
+  renderQLExercises();
+  updateQLProgress();
+  if (!ex.done) startRestTimer();
+  // Scroll to next if all sets done
+  if (ex.done) {
+    const nextIdx = qlState.exercises.findIndex((e, i) => i > exIdx && !e.done);
+    if (nextIdx !== -1) {
+      setTimeout(() => {
+        const c = document.getElementById('ql-card-' + nextIdx);
+        if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    }
+  }
+}
+
+function qlDoneWarmup(idx) {
+  const ex = qlState.exercises[idx];
+  ex.warmupData = {
+    duration: document.getElementById('ql-warmup-dur-' + idx).value.trim(),
+    distance: document.getElementById('ql-warmup-dist-' + idx).value.trim(),
+    bpm: document.getElementById('ql-warmup-bpm-' + idx).value.trim(),
+    cal: document.getElementById('ql-warmup-cal-' + idx).value.trim()
+  };
+  ex.done = true;
+  ex.expanded = false;
+  if (qlState.exercises[1]) qlState.exercises[1].expanded = true;
+  renderQLExercises();
+  updateQLProgress();
+  setTimeout(() => {
+    const c = document.getElementById('ql-card-1');
+    if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 120);
+}
+
+function updateQLProgress() {
+  const done = qlState.exercises.filter(e => e.done).length;
+  document.getElementById('ql-progress-label').textContent = done + ' / ' + qlState.exercises.length + ' done';
+}
+
+function finishQuickLog() {
+  const anyLogged = qlState.exercises.some(e => e.done || (e.setLogs && e.setLogs.some(s => s.logged)));
+  if (!anyLogged) { alert('Log at least one exercise before saving.'); return; }
+
+  const day = qlState.day;
+  const exerciseObjects = [];
+  qlState.exercises.forEach(ex => {
+    if (!ex.done && !(ex.setLogs && ex.setLogs.some(s => s.logged))) return;
+    if (ex.isWarmup) {
+      const d = ex.warmupData;
+      const parts = [d.duration && d.duration + ' min', d.distance && d.distance + ' mi', d.bpm && d.bpm + ' BPM', d.cal && d.cal + ' cal'].filter(Boolean);
+      exerciseObjects.push({ name: 'Treadmill warmup', machine: parts.join(' · ') || '15 min' });
+    } else {
+      const logged = ex.setLogs.filter(s => s.logged);
+      if (logged.length === 0) return;
+      exerciseObjects.push({ name: ex.name, sets: logged.length, reps: logged[logged.length - 1].reps, weight: logged[logged.length - 1].weight });
+    }
+  });
+
+  workouts.unshift({ id: Date.now(), date: todayStr(), type: 'Full Body — ' + PROGRAM[day].label, exercises: exerciseObjects, notes: '' });
+  save(KEY_WORKOUTS, workouts);
+
+  const today = todayStr();
+  if (!attendance.includes(today)) { attendance.push(today); save(KEY_ATTENDANCE, attendance); }
+
+  document.getElementById('ql-overlay').style.display = 'none';
+  skipRestTimer();
+  qlState = null;
+  renderCalendar();
+  renderNextWorkoutBanner();
+  alert('Workout saved! 💪');
+}
+
+function startRestTimer() {
+  if (restTimerInterval) clearInterval(restTimerInterval);
+  let secs = 90;
+  const banner = document.getElementById('ql-rest-banner');
+  const timeEl = document.getElementById('ql-rest-time');
+  function fmt(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  banner.style.display = 'flex';
+  timeEl.textContent = fmt(secs);
+  restTimerInterval = setInterval(() => {
+    secs--;
+    timeEl.textContent = fmt(secs);
+    if (secs <= 0) skipRestTimer();
+  }, 1000);
+}
+
+function skipRestTimer() {
+  if (restTimerInterval) { clearInterval(restTimerInterval); restTimerInterval = null; }
+  const b = document.getElementById('ql-rest-banner');
+  if (b) b.style.display = 'none';
+}
+
+// Close modals on overlay click
+document.getElementById('workout-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeWorkoutModal(); });
+document.getElementById('metric-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeMetricModal(); });
+
+// Init
+renderCalendar();
+renderNextWorkoutBanner();
+</script>
+</body>
+</html>
