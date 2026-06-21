@@ -1315,13 +1315,15 @@ function updateWeekStats() {
   const weekStart = getWeekStart(today);
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
 
+  function parseLocalDate(s) { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+
   const thisWeek = attendance.filter(d => {
-    const day = new Date(d);
+    const day = parseLocalDate(d);
     return day >= weekStart && day < weekEnd;
   }).length;
 
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const thisMonth = attendance.filter(d => new Date(d) >= monthStart && new Date(d) <= today).length;
+  const thisMonth = attendance.filter(d => { const day = parseLocalDate(d); return day >= monthStart && day <= today; }).length;
 
   // streak
   let streak = 0;
