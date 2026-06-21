@@ -957,6 +957,7 @@ function onAuthSuccess() {
   document.getElementById('nav-user-email').textContent = currentUser.email;
   document.getElementById('nav-signout-btn').style.display = '';
   syncFromSupabase();
+  restoreQLSession();
 }
 
 async function syncToSupabase(key, val) {
@@ -1011,10 +1012,35 @@ _supabase.auth.onAuthStateChange((event, session) => {
 // ========================
 //   DATA LAYER (localStorage)
 // ========================
-const KEY_ATTENDANCE = 'fit_attendance';
-const KEY_WORKOUTS   = 'fit_workouts';
-const KEY_METRICS    = 'fit_metrics';
-const KEY_GOAL       = 'fit_weekly_goal';
+const KEY_ATTENDANCE  = 'fit_attendance';
+const KEY_WORKOUTS    = 'fit_workouts';
+const KEY_METRICS     = 'fit_metrics';
+const KEY_GOAL        = 'fit_weekly_goal';
+const KEY_QL_SESSION  = 'fit_ql_session';
+
+function saveQLSession() {
+  if (!qlState) return;
+  localStorage.setItem(KEY_QL_SESSION, JSON.stringify({ date: todayStr(), state: qlState }));
+}
+function clearQLSession() {
+  localStorage.removeItem(KEY_QL_SESSION);
+}
+function restoreQLSession() {
+  const raw = localStorage.getItem(KEY_QL_SESSION);
+  if (!raw) return;
+  try {
+    const { date, state } = JSON.parse(raw);
+    if (date !== todayStr()) { clearQLSession(); return; }
+    qlState = state;
+    const prog = PROGRAM[qlState.day];
+    document.getElementById('ql-overlay').style.display = 'block';
+    document.getElementById('ql-day-label').textContent = prog.label + ' · ' + prog.desc;
+    document.getElementById('ql-day-label').style.color = prog.color;
+    document.getElementById('ql-date-label').textContent = formatDateDisplay(todayStr());
+    renderQLExercises();
+    updateQLProgress();
+  } catch(e) { clearQLSession(); }
+}
 
 function load(key, def) {
   try { return JSON.parse(localStorage.getItem(key)) ?? def; } catch { return def; }
@@ -1713,12 +1739,14 @@ function openQuickLog() {
   qlState.exercises[0].expanded = true;
   renderQLExercises();
   updateQLProgress();
+  saveQLSession();
   document.getElementById('ql-overlay').scrollTop = 0;
 }
 
 function closeQuickLog() {
   const hasData = qlState && qlState.exercises.some(e => e.done || (e.setLogs && e.setLogs.some(s => s.logged)));
   if (hasData && !confirm('Exit workout? Unsaved progress will be lost.')) return;
+  clearQLSession();
   document.getElementById('ql-overlay').style.display = 'none';
   skipRestTimer();
   qlState = null;
@@ -1871,6 +1899,7 @@ function qlAddExercise() {
   qlState.showingAdd = false;
   renderQLExercises();
   updateQLProgress();
+  saveQLSession();
   setTimeout(() => { document.getElementById('ql-overlay').scrollTop = document.getElementById('ql-overlay').scrollHeight; }, 50);
 }
 
@@ -1914,6 +1943,7 @@ function qlApplySwap(idx, name) {
     ex.setLogs.forEach(s => { if (!s.logged) s.weight = suggested; });
   }
   renderQLExercises();
+  saveQLSession();
 }
 
 function qlLogSet(exIdx, setIdx) {
@@ -1939,6 +1969,7 @@ function qlLogSet(exIdx, setIdx) {
   }
   renderQLExercises();
   updateQLProgress();
+  saveQLSession();
   if (!ex.done) startRestTimer();
   // Scroll to next if all sets done
   if (ex.done) {
@@ -1965,6 +1996,7 @@ function qlDoneWarmup(idx) {
   if (qlState.exercises[1]) qlState.exercises[1].expanded = true;
   renderQLExercises();
   updateQLProgress();
+  saveQLSession();
   setTimeout(() => {
     const c = document.getElementById('ql-card-1');
     if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2001,6 +2033,7 @@ function finishQuickLog() {
   const today = todayStr();
   if (!attendance.includes(today)) { attendance.push(today); save(KEY_ATTENDANCE, attendance); }
 
+  clearQLSession();
   document.getElementById('ql-overlay').style.display = 'none';
   skipRestTimer();
   qlState = null;
