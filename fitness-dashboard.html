@@ -1702,7 +1702,8 @@ function openQuickLog() {
         ...ex, expanded: false, done: false, showingSwap: false, progression: p,
         setLogs: Array.from({ length: ex.sets }, () => ({ weight: suggestedWeight, reps: ex.reps, logged: false }))
       };
-    })
+    }),
+    showingAdd: false
   };
   document.getElementById('ql-overlay').style.display = 'block';
   document.getElementById('ql-day-label').textContent = prog.label + ' · ' + prog.desc;
@@ -1824,6 +1825,53 @@ function renderQLExercises() {
       <div class="ql-card-body" ${ex.expanded && !ex.done ? '' : 'style="display:none"'}>${bodyHTML}</div>`;
     list.appendChild(card);
   });
+
+  // Add Exercise button at bottom
+  const addSection = document.createElement('div');
+  addSection.style.cssText = 'margin-top:8px;margin-bottom:80px';
+  if (qlState.showingAdd) {
+    const exList = getProgramExerciseList();
+    const opts = exList.map(n => `<option value="${n}">${n}</option>`).join('');
+    addSection.innerHTML = `
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+        <div style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:10px">Choose exercise to add:</div>
+        <div style="display:flex;gap:8px">
+          <select id="ql-add-select" class="form-input" style="flex:1">${opts}</select>
+          <button onclick="qlAddExercise()" class="btn btn-primary">Add</button>
+          <button onclick="qlState.showingAdd=false;renderQLExercises()" class="btn btn-outline">✕</button>
+        </div>
+      </div>`;
+  } else {
+    addSection.innerHTML = `<button onclick="qlState.showingAdd=true;renderQLExercises()" style="width:100%;background:transparent;border:2px dashed var(--border);color:var(--text-muted);padding:14px;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent">+ Add Exercise</button>`;
+  }
+  list.appendChild(addSection);
+}
+
+function qlAddExercise() {
+  const sel = document.getElementById('ql-add-select');
+  if (!sel) return;
+  const name = sel.value;
+  if (!name) return;
+  let found = null;
+  ['A','B','C'].forEach(day => {
+    PROGRAM[day].exercises.forEach(ex => {
+      if (ex.name === name && !ex.isWarmup && !found) found = ex;
+    });
+  });
+  const p = getProgressionStatus(name);
+  const useWeight = p.currentWeight || (found ? found.weight : 0);
+  const suggested = p.ready ? p.nextWeight : useWeight;
+  const sets = found ? found.sets : 3;
+  const reps = found ? found.reps : 12;
+  qlState.exercises.push({
+    name, img: found ? found.img : '', sets, reps, weight: useWeight,
+    expanded: true, done: false, showingSwap: false, progression: p,
+    setLogs: Array.from({ length: sets }, () => ({ weight: suggested, reps, logged: false }))
+  });
+  qlState.showingAdd = false;
+  renderQLExercises();
+  updateQLProgress();
+  setTimeout(() => { document.getElementById('ql-overlay').scrollTop = document.getElementById('ql-overlay').scrollHeight; }, 50);
 }
 
 function qlToggle(idx) {
