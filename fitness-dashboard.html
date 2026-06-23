@@ -245,7 +245,10 @@
       <div style="font-size:20px;font-weight:700;margin-bottom:2px" id="next-workout-label">Day A</div>
       <div style="font-size:13px;color:var(--text-muted)" id="next-workout-sub">—</div>
     </div>
-    <button class="btn btn-primary" onclick="openQuickLog()" style="font-size:15px;padding:13px 22px;flex-shrink:0">▶ Start</button>
+    <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+      <button class="btn btn-primary" onclick="openQuickLog()" style="font-size:15px;padding:13px 22px">▶ Start</button>
+      <button class="btn btn-outline" onclick="openHomeWorkout()" style="font-size:13px;padding:9px 16px;color:#0ea5e9;border-color:#bae6fd">🏠 Home Workout</button>
+    </div>
   </div>
 
   <!-- Weekly Goal Progress -->
@@ -1032,7 +1035,7 @@ function restoreQLSession() {
     const { date, state } = JSON.parse(raw);
     if (date !== todayStr()) { clearQLSession(); return; }
     qlState = state;
-    const prog = PROGRAM[qlState.day];
+    const prog = qlState.isHomeWorkout ? HOME_WORKOUT : PROGRAM[qlState.day];
     document.getElementById('ql-overlay').style.display = 'block';
     document.getElementById('ql-day-label').textContent = prog.label + ' · ' + prog.desc;
     document.getElementById('ql-day-label').style.color = prog.color;
@@ -1150,6 +1153,22 @@ const WILDCARDS = [
   { name: 'Abdominal Crunch',      sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
   { name: 'Dependent Curl',        sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0837-USAB.jpg' },
 ];
+
+// Home workout — for days Meg can't get to the gym
+const HOME_WORKOUT = {
+  label: 'Home Workout', desc: 'Full Body · No Gym Required',
+  color: '#0ea5e9', colorLight: '#f0f9ff',
+  exercises: [
+    { name: 'Warmup',                 isWarmup: true, isHomeWarmup: true, note: '5 min — march in place, arm circles, hip circles', img: '' },
+    { name: 'Goblet Squat',           sets: 3, reps: 12, weight: 12, img: 'https://spotebi.com/wp-content/uploads/2015/05/kettlebell-goblet-squat-exercise-illustration.jpg' },
+    { name: 'Romanian Deadlift',      sets: 3, reps: 12, weight: 35, img: 'https://spotebi.com/wp-content/uploads/2015/05/romanian-deadlift-exercise-illustration.jpg' },
+    { name: 'Floor Chest Press',      sets: 3, reps: 12, weight: 10, img: 'https://spotebi.com/wp-content/uploads/2015/05/floor-press-exercise-illustration.jpg' },
+    { name: 'Bent-Over Row',          sets: 3, reps: 12, weight: 10, img: 'https://spotebi.com/wp-content/uploads/2015/04/dumbbell-bent-over-row-exercise-illustration.jpg' },
+    { name: 'Overhead Press',         sets: 3, reps: 12, weight: 8,  img: 'https://spotebi.com/wp-content/uploads/2015/05/dumbbell-shoulder-press-exercise-illustration.jpg' },
+    { name: 'Kettlebell Swing',       sets: 3, reps: 15, weight: 12, img: 'https://spotebi.com/wp-content/uploads/2015/05/kettlebell-swing-exercise-illustration.jpg' },
+    { name: 'Med Ball Russian Twist', sets: 3, reps: 12, weight: 15, img: 'https://spotebi.com/wp-content/uploads/2015/04/russian-twist-exercise-illustration.jpg' },
+  ]
+};
 
 // ========================
 //   DAY ROTATION + PROGRESSION
@@ -1762,6 +1781,35 @@ function openQuickLog() {
   document.getElementById('ql-overlay').scrollTop = 0;
 }
 
+function openHomeWorkout() {
+  qlState = {
+    day: null,
+    isHomeWorkout: true,
+    showingAdd: false,
+    exercises: HOME_WORKOUT.exercises.map(ex => {
+      if (ex.isWarmup) {
+        return { ...ex, expanded: false, done: false, showingSwap: false };
+      }
+      const p = getProgressionStatus(ex.name);
+      const useWeight = p.currentWeight || ex.weight;
+      const suggestedWeight = p.ready ? p.nextWeight : useWeight;
+      return {
+        ...ex, expanded: false, done: false, showingSwap: false, progression: p,
+        setLogs: Array.from({ length: ex.sets }, () => ({ weight: suggestedWeight, reps: ex.reps, logged: false }))
+      };
+    })
+  };
+  document.getElementById('ql-overlay').style.display = 'block';
+  document.getElementById('ql-day-label').textContent = HOME_WORKOUT.label + ' · ' + HOME_WORKOUT.desc;
+  document.getElementById('ql-day-label').style.color = HOME_WORKOUT.color;
+  document.getElementById('ql-date-label').textContent = formatDateDisplay(todayStr());
+  qlState.exercises[0].expanded = true;
+  renderQLExercises();
+  updateQLProgress();
+  saveQLSession();
+  document.getElementById('ql-overlay').scrollTop = 0;
+}
+
 function closeQuickLog() {
   const hasData = qlState && qlState.exercises.some(e => e.done || (e.setLogs && e.setLogs.some(s => s.logged)));
   if (hasData && !confirm('Exit workout? Unsaved progress will be lost.')) return;
@@ -1812,7 +1860,7 @@ function renderQLExercises() {
         ).join('');
         swapPanel = `<div style="padding:10px 0 12px;border-bottom:1px solid var(--border);margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Replace warmup with:</div><div style="display:flex;flex-wrap:wrap;gap:6px">${opts}</div></div>`;
       } else {
-        const exList = getProgramExerciseList();
+        const exList = getExerciseListForSession();
         const opts = exList.map(n => `<option value="${n}"${n === ex.name ? ' selected' : ''}>${n}</option>`).join('');
         swapPanel = `<div style="padding:10px 0 12px;border-bottom:1px solid var(--border);margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Replace with:</div><div style="display:flex;gap:8px"><select id="ql-swap-${i}" class="form-input" style="flex:1">${opts}</select><button onclick="qlApplySwap(${i})" class="btn btn-primary btn-sm">Apply</button></div></div>`;
       }
@@ -1821,27 +1869,36 @@ function renderQLExercises() {
     // Build body
     let bodyHTML = '';
     if (ex.isWarmup) {
-      const d = ex.warmupData;
-      bodyHTML = swapPanel + `
-        <div class="ql-warmup-grid" style="padding-top:10px">
-          <div>
-            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Duration (min)</label>
-            <input class="ql-num-input" style="width:100%" id="ql-warmup-dur-${i}" value="${d.duration}" type="text" placeholder="15">
+      if (ex.isHomeWarmup) {
+        bodyHTML = swapPanel + `
+          <div style="padding:14px 0 8px">
+            <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:6px">${ex.note}</div>
+            <div style="font-size:12px;color:var(--text-muted)">Low-impact warmup — no equipment needed. Get the blood flowing before lifting!</div>
           </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Distance (mi)</label>
-            <input class="ql-num-input" style="width:100%" id="ql-warmup-dist-${i}" value="${d.distance}" type="text" placeholder="0.62">
+          <button class="ql-log-btn warmup-done" onclick="qlDoneWarmup(${i})">Warmup Done ✓</button>`;
+      } else {
+        const d = ex.warmupData;
+        bodyHTML = swapPanel + `
+          <div class="ql-warmup-grid" style="padding-top:10px">
+            <div>
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Duration (min)</label>
+              <input class="ql-num-input" style="width:100%" id="ql-warmup-dur-${i}" value="${d.duration}" type="text" placeholder="15">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Distance (mi)</label>
+              <input class="ql-num-input" style="width:100%" id="ql-warmup-dist-${i}" value="${d.distance}" type="text" placeholder="0.62">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Avg BPM</label>
+              <input class="ql-num-input" style="width:100%" id="ql-warmup-bpm-${i}" value="${d.bpm}" type="text" placeholder="136">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Calories</label>
+              <input class="ql-num-input" style="width:100%" id="ql-warmup-cal-${i}" value="${d.cal}" type="text" placeholder="129">
+            </div>
           </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Avg BPM</label>
-            <input class="ql-num-input" style="width:100%" id="ql-warmup-bpm-${i}" value="${d.bpm}" type="text" placeholder="136">
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Calories</label>
-            <input class="ql-num-input" style="width:100%" id="ql-warmup-cal-${i}" value="${d.cal}" type="text" placeholder="129">
-          </div>
-        </div>
-        <button class="ql-log-btn warmup-done" onclick="qlDoneWarmup(${i})">Warmup Done ✓</button>`;
+          <button class="ql-log-btn warmup-done" onclick="qlDoneWarmup(${i})">Warmup Done ✓</button>`;
+      }
     } else {
       const rows = ex.setLogs.map((s, si) => `
         <div class="ql-set-row" style="${s.logged ? 'opacity:0.55' : ''}">
@@ -1877,7 +1934,7 @@ function renderQLExercises() {
   const addSection = document.createElement('div');
   addSection.style.cssText = 'margin-top:8px;margin-bottom:80px';
   if (qlState.showingAdd) {
-    const exList = getProgramExerciseList();
+    const exList = getExerciseListForSession();
     const opts = exList.map(n => `<option value="${n}">${n}</option>`).join('');
     addSection.innerHTML = `
       <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px">
@@ -1900,11 +1957,15 @@ function qlAddExercise() {
   const name = sel.value;
   if (!name) return;
   let found = null;
-  ['A','B','C'].forEach(day => {
-    PROGRAM[day].exercises.forEach(ex => {
-      if (ex.name === name && !ex.isWarmup && !found) found = ex;
+  if (qlState.isHomeWorkout) {
+    found = HOME_WORKOUT.exercises.find(ex => ex.name === name && !ex.isWarmup) || null;
+  } else {
+    ['A','B','C'].forEach(day => {
+      PROGRAM[day].exercises.forEach(ex => {
+        if (ex.name === name && !ex.isWarmup && !found) found = ex;
+      });
     });
-  });
+  }
   const p = getProgressionStatus(name);
   const useWeight = p.currentWeight || (found ? found.weight : 0);
   const suggested = p.ready ? p.nextWeight : useWeight;
@@ -1937,6 +1998,12 @@ function getProgramExerciseList() {
     });
   });
   return list.sort();
+}
+function getHomeExerciseList() {
+  return HOME_WORKOUT.exercises.filter(ex => !ex.isWarmup).map(ex => ex.name).sort();
+}
+function getExerciseListForSession() {
+  return (qlState && qlState.isHomeWorkout) ? getHomeExerciseList() : getProgramExerciseList();
 }
 
 function qlToggleSwap(idx, event) {
@@ -2004,12 +2071,14 @@ function qlLogSet(exIdx, setIdx) {
 
 function qlDoneWarmup(idx) {
   const ex = qlState.exercises[idx];
-  ex.warmupData = {
-    duration: document.getElementById('ql-warmup-dur-' + idx).value.trim(),
-    distance: document.getElementById('ql-warmup-dist-' + idx).value.trim(),
-    bpm: document.getElementById('ql-warmup-bpm-' + idx).value.trim(),
-    cal: document.getElementById('ql-warmup-cal-' + idx).value.trim()
-  };
+  if (!ex.isHomeWarmup) {
+    ex.warmupData = {
+      duration: document.getElementById('ql-warmup-dur-' + idx).value.trim(),
+      distance: document.getElementById('ql-warmup-dist-' + idx).value.trim(),
+      bpm: document.getElementById('ql-warmup-bpm-' + idx).value.trim(),
+      cal: document.getElementById('ql-warmup-cal-' + idx).value.trim()
+    };
+  }
   ex.done = true;
   ex.expanded = false;
   if (qlState.exercises[1]) qlState.exercises[1].expanded = true;
@@ -2036,9 +2105,13 @@ function finishQuickLog() {
   qlState.exercises.forEach(ex => {
     if (!ex.done && !(ex.setLogs && ex.setLogs.some(s => s.logged))) return;
     if (ex.isWarmup) {
-      const d = ex.warmupData;
-      const parts = [d.duration && d.duration + ' min', d.distance && d.distance + ' mi', d.bpm && d.bpm + ' BPM', d.cal && d.cal + ' cal'].filter(Boolean);
-      exerciseObjects.push({ name: 'Treadmill warmup', machine: parts.join(' · ') || '15 min' });
+      if (ex.isHomeWarmup) {
+        exerciseObjects.push({ name: 'Warmup', machine: ex.note });
+      } else {
+        const d = ex.warmupData || {};
+        const parts = [d.duration && d.duration + ' min', d.distance && d.distance + ' mi', d.bpm && d.bpm + ' BPM', d.cal && d.cal + ' cal'].filter(Boolean);
+        exerciseObjects.push({ name: 'Treadmill warmup', machine: parts.join(' · ') || '15 min' });
+      }
     } else {
       const logged = ex.setLogs.filter(s => s.logged);
       if (logged.length === 0) return;
@@ -2046,14 +2119,17 @@ function finishQuickLog() {
     }
   });
 
-  workouts.unshift({ id: Date.now(), date: todayStr(), type: 'Full Body — ' + PROGRAM[day].label, exercises: exerciseObjects, notes: '' });
+  const workoutType = qlState.isHomeWorkout ? 'Full Body — Home' : 'Full Body — ' + PROGRAM[day].label;
+  workouts.unshift({ id: Date.now(), date: todayStr(), type: workoutType, exercises: exerciseObjects, notes: '' });
   save(KEY_WORKOUTS, workouts);
 
   const today = todayStr();
   if (!attendance.includes(today)) { attendance.push(today); save(KEY_ATTENDANCE, attendance); }
 
-  // Advance wildcard for next session
-  save('fit_wildcard_idx', (load('fit_wildcard_idx', 0) + 1) % WILDCARDS.length);
+  // Advance wildcard for next gym session (not home workouts)
+  if (!qlState.isHomeWorkout) {
+    save('fit_wildcard_idx', (load('fit_wildcard_idx', 0) + 1) % WILDCARDS.length);
+  }
   clearQLSession();
   document.getElementById('ql-overlay').style.display = 'none';
   skipRestTimer();
