@@ -1109,7 +1109,6 @@ const PROGRAM = {
       { name: 'Shoulder Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0814-USAB.jpg' },
       { name: 'Triceps Press', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/MGM0807-USAB-1.jpg' },
       { name: 'Cable Tower — Overhead', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/ZMF4005849.jpg' },
-      { name: 'Abdominal Crunch', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
     ]
   },
   B: {
@@ -1123,7 +1122,6 @@ const PROGRAM = {
       { name: 'Seated Row', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/MGM0809-USAB.jpg' },
       { name: 'Cable Tower — Low Row', sets: 3, reps: 12, weight: 50, img: 'https://images.jhtassets.com/uploads/ZMF4005849.jpg' },
       { name: 'Biceps Curl', sets: 3, reps: 12, weight: 20, img: 'https://images.jhtassets.com/uploads/MGM0806-USAB-1.jpg' },
-      { name: 'Dependent Curl', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0837-USAB.jpg' },
     ]
   },
   C: {
@@ -1137,10 +1135,21 @@ const PROGRAM = {
       { name: 'Triceps Extension', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0835-USAB.jpg' },
       { name: 'Shoulder Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0814-USAB.jpg' },
       { name: 'Rotary Torso', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0805-USAB-1.jpg' },
-      { name: 'Abdominal Crunch', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
     ]
   }
 };
+
+// Wildcard pool — rotates as the last exercise each session
+const WILDCARDS = [
+  { name: 'Glute Machine',         sets: 3, reps: 12, weight: 30, img: 'https://images.jhtassets.com/uploads/MGM0803-USAB-1.jpg' },
+  { name: 'Hip Adductor/Abductor', sets: 3, reps: 12, weight: 40, img: 'https://images.jhtassets.com/uploads/MGM0815-USAB.jpg' },
+  { name: 'Prone Leg Curl',        sets: 3, reps: 12, weight: 30, img: 'https://images.jhtassets.com/uploads/MGM0801-USAB-1.jpg' },
+  { name: 'Glute Lift Elite',      sets: 3, reps: 15, weight: 0,  img: '' },
+  { name: 'Target Abs',            sets: 3, reps: 15, weight: 0,  img: '' },
+  { name: 'Elevate Core',          sets: 3, reps: 12, weight: 0,  img: '' },
+  { name: 'Abdominal Crunch',      sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
+  { name: 'Dependent Curl',        sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0837-USAB.jpg' },
+];
 
 // ========================
 //   DAY ROTATION + PROGRESSION
@@ -1731,6 +1740,16 @@ function openQuickLog() {
     }),
     showingAdd: false
   };
+  // Append rotating wildcard as last exercise
+  const wcIdx = load('fit_wildcard_idx', 0) % WILDCARDS.length;
+  const wc = WILDCARDS[wcIdx];
+  const wcp = getProgressionStatus(wc.name);
+  const wcWeight = wcp.currentWeight || wc.weight;
+  const wcSuggested = wcp.ready ? wcp.nextWeight : wcWeight;
+  qlState.exercises.push({
+    ...wc, expanded: false, done: false, showingSwap: false, isWildcard: true, progression: wcp,
+    setLogs: Array.from({ length: wc.sets }, () => ({ weight: wcSuggested, reps: wc.reps, logged: false }))
+  });
   document.getElementById('ql-overlay').style.display = 'block';
   document.getElementById('ql-day-label').textContent = prog.label + ' · ' + prog.desc;
   document.getElementById('ql-day-label').style.color = prog.color;
@@ -1844,7 +1863,7 @@ function renderQLExercises() {
         <div class="${dotClass}">${dotContent}</div>
         <img class="ql-card-img" src="${ex.img}" onerror="this.style.display='none'" alt="">
         <div style="flex:1;min-width:0">
-          <div class="ql-card-name">${ex.name}${doneLabel}</div>
+          <div class="ql-card-name">${ex.name}${doneLabel}${ex.isWildcard ? ' <span style="font-size:11px;font-weight:600;color:#7c3aed;background:#ede9fe;padding:2px 6px;border-radius:8px;vertical-align:middle">🎲 wildcard</span>' : ''}</div>
           <div class="ql-card-sub">${subText}</div>
         </div>
         ${extraBadge}
@@ -2033,6 +2052,8 @@ function finishQuickLog() {
   const today = todayStr();
   if (!attendance.includes(today)) { attendance.push(today); save(KEY_ATTENDANCE, attendance); }
 
+  // Advance wildcard for next session
+  save('fit_wildcard_idx', (load('fit_wildcard_idx', 0) + 1) % WILDCARDS.length);
   clearQLSession();
   document.getElementById('ql-overlay').style.display = 'none';
   skipRestTimer();
