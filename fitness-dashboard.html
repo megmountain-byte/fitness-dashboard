@@ -1099,47 +1099,45 @@ let weeklyGoal = load(KEY_GOAL, 4);
 // ========================
 const PROGRAM = {
   A: {
-    label: 'Day A', desc: 'Push emphasis · Chest · Shoulders · Legs · Core',
+    label: 'Day A', desc: 'Push · Chest · Shoulders · Triceps',
     color: '#6366f1', colorLight: '#eef2ff',
     exercises: [
       { name: 'Treadmill', isWarmup: true, note: '15 min walk', img: 'https://images.jhtassets.com/uploads/T7XE.jpg' },
       { name: 'Leg Press', sets: 3, reps: 12, weight: 75, img: 'https://images.jhtassets.com/uploads/IMG_0030.jpg' },
       { name: 'Leg Extension', sets: 3, reps: 12, weight: 35, img: 'https://www.renewfit.com/photos/ph1671718438520.jpg' },
       { name: 'Chest Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/IMG_0016.jpg' },
-      { name: 'Lat Pulldown', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0808-USAB-1.jpg' },
       { name: 'Shoulder Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0814-USAB.jpg' },
+      { name: 'Triceps Press', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/MGM0807-USAB-1.jpg' },
+      { name: 'Cable Tower — Overhead', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/ZMF4005849.jpg' },
       { name: 'Abdominal Crunch', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
-      { name: 'Back Extension', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0798-USAB-1.jpg' },
-      { name: 'Biceps Curl', sets: 3, reps: 12, weight: 20, img: 'https://images.jhtassets.com/uploads/MGM0806-USAB-1.jpg' },
     ]
   },
   B: {
-    label: 'Day B', desc: 'Pull emphasis · Back · Arms · Legs · Core',
+    label: 'Day B', desc: 'Pull · Back · Biceps',
     color: '#10b981', colorLight: '#ecfdf5',
     exercises: [
       { name: 'Treadmill', isWarmup: true, note: '15 min walk', img: 'https://images.jhtassets.com/uploads/T7XE.jpg' },
       { name: 'Leg Press', sets: 3, reps: 12, weight: 75, img: 'https://images.jhtassets.com/uploads/IMG_0030.jpg' },
       { name: 'Seated Leg Curl', sets: 3, reps: 12, weight: 35, img: 'https://images.jhtassets.com/uploads/MGM0802-USAB-1.jpg' },
+      { name: 'Lat Pulldown', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0808-USAB-1.jpg' },
       { name: 'Seated Row', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/MGM0809-USAB.jpg' },
-      { name: 'Shoulder Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0814-USAB.jpg' },
-      { name: 'Rotary Torso', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0805-USAB-1.jpg' },
-      { name: 'Triceps Extension', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0835-USAB.jpg' },
+      { name: 'Cable Tower — Low Row', sets: 3, reps: 12, weight: 50, img: 'https://images.jhtassets.com/uploads/ZMF4005849.jpg' },
+      { name: 'Biceps Curl', sets: 3, reps: 12, weight: 20, img: 'https://images.jhtassets.com/uploads/MGM0806-USAB-1.jpg' },
       { name: 'Dependent Curl', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0837-USAB.jpg' },
     ]
   },
   C: {
-    label: 'Day C', desc: 'Legs emphasis · Back · Triceps · Core',
+    label: 'Day C', desc: 'Full Body Mix · Back · Triceps · Core',
     color: '#f59e0b', colorLight: '#fffbeb',
     exercises: [
       { name: 'Treadmill', isWarmup: true, note: '15 min walk', img: 'https://images.jhtassets.com/uploads/T7XE.jpg' },
       { name: 'Leg Press', sets: 3, reps: 12, weight: 75, img: 'https://images.jhtassets.com/uploads/IMG_0030.jpg' },
-      { name: 'Seated Leg Curl', sets: 3, reps: 12, weight: 35, img: 'https://images.jhtassets.com/uploads/MGM0802-USAB-1.jpg' },
-      { name: 'Lat Pulldown', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0808-USAB-1.jpg' },
-      { name: 'Cable Tower — Low Row', sets: 3, reps: 12, weight: 50, img: 'https://images.jhtassets.com/uploads/ZMF4005849.jpg' },
-      { name: 'Triceps Press', sets: 3, reps: 12, weight: 55, img: 'https://images.jhtassets.com/uploads/MGM0807-USAB-1.jpg' },
+      { name: 'Leg Extension', sets: 3, reps: 12, weight: 35, img: 'https://www.renewfit.com/photos/ph1671718438520.jpg' },
+      { name: 'Back Extension', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0798-USAB-1.jpg' },
+      { name: 'Triceps Extension', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0835-USAB.jpg' },
+      { name: 'Shoulder Press', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0814-USAB.jpg' },
       { name: 'Rotary Torso', sets: 3, reps: 12, weight: 45, img: 'https://images.jhtassets.com/uploads/MGM0805-USAB-1.jpg' },
       { name: 'Abdominal Crunch', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0796-USAB-1.jpg' },
-      { name: 'Back Extension', sets: 3, reps: 12, weight: 65, img: 'https://images.jhtassets.com/uploads/MGM0798-USAB-1.jpg' },
     ]
   }
 };
